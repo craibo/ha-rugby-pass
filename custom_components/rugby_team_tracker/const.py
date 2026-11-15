@@ -1,9 +1,9 @@
-"""Constants for the RugbyPass integration."""
+"""Constants for the Rugby Team Tracker integration."""
 
-DOMAIN = "rugbypass"
+DOMAIN = "rugby_team_tracker"
 USER_AGENT = (
-    "ha-rugby-pass/0.1.0 (+https://github.com/craibo/ha-rugby-pass; "
-    "Home Assistant custom integration)"
+    "ha-rugby-team-tracker/0.5.0 "
+    "(+https://github.com/craibo/ha-rugby-team-tracker)"
 )
 PERIODS = (
     "Kick off",

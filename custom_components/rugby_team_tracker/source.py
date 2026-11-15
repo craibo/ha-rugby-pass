@@ -1,4 +1,4 @@
-"""Game sources: parse RugbyPass fixtures-results pages into games."""
+"""Game sources: parse the data source fixtures-results pages into games."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ from typing import Any, Protocol, runtime_checkable
 
 from .models import Game, Team
 
-# RugbyPass embeds the season's games as JSON text inside a hidden div:
+# The data source embeds the season's games as JSON text inside a hidden div:
 #   <div id="current-game-days" style="display: none;">[ {day}, ... ]</div>
 # day = {"epoch", "title", "tournaments": [ {"title", "order", "games": [...]} ]}
 # A sibling div, "current-final-days", holds play-off placeholders with no
 # teams (only id/epoch/round/venue "TBD"); it is deliberately not read, as
-# those are not followable games until RugbyPass moves them into game-days.
+# those are not followable games until the data source moves them into game-days.
 GAME_DAYS_MARKER = 'id="current-game-days"'
 # Standings pages embed the league table the same way:
 #   <div id="standings-data" style="display: none;">{...}</div>
@@ -52,7 +52,7 @@ class GameSource(Protocol):
 
 
 def parse_games(page: str) -> list[Game]:
-    """Parse a RugbyPass fixtures-results page into games."""
+    """Parse a data source fixtures-results page into games."""
     games: list[Game] = []
     found = 0
     for raw in _iter_raw_games(_extract_game_days(page)):
@@ -108,7 +108,7 @@ def _extract_inline_json(
 
 
 def parse_standings(page: str) -> dict[int, int]:
-    """Parse a RugbyPass standings page into team id -> league position.
+    """Parse a data source standings page into team id -> league position.
 
     Only a single league table is used: pool or conference pages (such as
     the World Cup) give positions within a pool, which would read as league
@@ -149,7 +149,7 @@ def _parse_standings(page: str) -> dict[int, int]:
 
 
 def parse_world_rankings(page: str) -> dict[str, int]:
-    """Parse the RugbyPass men's world rankings page: team slug -> position.
+    """Parse the data source men's world rankings page: team slug -> position.
 
     Entries without a non-empty slug or a usable position (>= 1) are
     skipped; for a repeated slug the first entry wins.

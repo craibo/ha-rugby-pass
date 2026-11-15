@@ -1,4 +1,4 @@
-"""Data models for the RugbyPass integration."""
+"""Data models for the Rugby Team Tracker integration."""
 
 from __future__ import annotations
 
@@ -38,13 +38,13 @@ class Game:
     live: bool
     minute: int
     url: str
-    # RugbyPass competition slug (``tournamentUri``), e.g.
+    # Data source competition slug (``tournamentUri``), e.g.
     # "united-rugby-championship"; used to look up league positions.
     competition_slug: str = ""
 
 
 def derive_period(game: Game) -> str:
-    """Derive the match period; RugbyPass exposes no explicit field."""
+    """Derive the match period; the data source exposes no explicit field."""
     if game.status == "postponed":
         return _POSTPONED
     if game.status == "canceled":

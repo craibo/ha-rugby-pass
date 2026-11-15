@@ -1,4 +1,4 @@
-"""Config flow and options flow for RugbyPass."""
+"""Config flow and options flow for Rugby Team Tracker."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
 )
 
-from .client import RugbyPassClient, RugbyPassError
+from .client import RugbyTrackerClient, RugbyTrackerError
 from .const import DOMAIN
-from .coordinator import RugbyPassConfigEntry
+from .coordinator import RugbyTrackerConfigEntry
 
 
 async def _fetch_team_options(
@@ -24,9 +24,9 @@ async def _fetch_team_options(
 ) -> tuple[list[SelectOptionDict], dict[str, str]]:
     """Fetch the teams of the competitions; return select options and id -> name.
 
-    Raises RugbyPassError when a competition cannot be fetched.
+    Raises RugbyTrackerError when a competition cannot be fetched.
     """
-    client = RugbyPassClient(async_get_clientsession(hass))
+    client = RugbyTrackerClient(async_get_clientsession(hass))
     titles = client.list_competitions()
     names: dict[int, str] = {}
     where: dict[int, list[str]] = {}
@@ -52,8 +52,8 @@ def _select(options: list[SelectOptionDict]) -> SelectSelector:
     return SelectSelector(SelectSelectorConfig(options=options, multiple=True))
 
 
-class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the RugbyPass config flow."""
+class RugbyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle the Rugby Team Tracker config flow."""
 
     VERSION = 1
 
@@ -64,8 +64,8 @@ class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: RugbyPassConfigEntry) -> OptionsFlow:
-        return RugbyPassOptionsFlow()
+    def async_get_options_flow(config_entry: RugbyTrackerConfigEntry) -> OptionsFlow:
+        return RugbyTrackerOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -80,14 +80,14 @@ class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._team_options, self._team_names = await _fetch_team_options(
                     self.hass, self._competitions
                 )
-            except RugbyPassError:
+            except RugbyTrackerError:
                 errors["base"] = "cannot_connect"
             else:
                 if self._team_options:
                     return await self.async_step_teams()
                 errors["base"] = "no_teams"
 
-        titles = RugbyPassClient(async_get_clientsession(self.hass)).list_competitions()
+        titles = RugbyTrackerClient(async_get_clientsession(self.hass)).list_competitions()
         options = [SelectOptionDict(value=s, label=t) for s, t in titles.items()]
         return self.async_show_form(
             step_id="user",
@@ -107,7 +107,7 @@ class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             ids = [int(t) for t in user_input["teams"]]
             return self.async_create_entry(
-                title="RugbyPass",
+                title="Rugby Team Tracker",
                 data={
                     "competitions": self._competitions,
                     "teams": ids,
@@ -128,7 +128,7 @@ class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class RugbyPassOptionsFlow(OptionsFlow):
+class RugbyTrackerOptionsFlow(OptionsFlow):
     """Edit the followed teams."""
 
     def __init__(self) -> None:
@@ -145,7 +145,7 @@ class RugbyPassOptionsFlow(OptionsFlow):
         }
 
         if user_input is not None:
-            # No refetch: submitting must work even while RugbyPass is down.
+            # No refetch: submitting must work even while the data source is down.
             ids = [int(t) for t in user_input["teams"]]
             known = {**stored, **self._team_names}
             return self.async_create_entry(
@@ -163,9 +163,9 @@ class RugbyPassOptionsFlow(OptionsFlow):
             options, self._team_names = await _fetch_team_options(
                 self.hass, list(entry.data["competitions"])
             )
-        except RugbyPassError:
+        except RugbyTrackerError:
             # Still offer the followed teams (stored names) so they can be
-            # unfollowed while RugbyPass is unreachable.
+            # unfollowed while the data source is unreachable.
             errors["base"] = "cannot_connect"
 
         current = [

@@ -6,8 +6,8 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from custom_components.rugbypass import sensor as sensor_mod
-from custom_components.rugbypass.sensor import SLOTS
+from custom_components.rugby_team_tracker import sensor as sensor_mod
+from custom_components.rugby_team_tracker.sensor import SLOTS
 
 from .test_coordinator import g
 from .test_sensor import setup, state

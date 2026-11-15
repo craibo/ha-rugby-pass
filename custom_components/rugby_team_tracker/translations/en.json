@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "RugbyPass",
+        "title": "Rugby Team Tracker",
         "description": "Choose the competitions to follow.",
         "data": {
           "competitions": "Competitions"
@@ -17,11 +17,11 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to RugbyPass.",
+      "cannot_connect": "Failed to connect to the data source.",
       "no_teams": "No teams were found for the selected competitions."
     },
     "abort": {
-      "already_configured": "RugbyPass is already configured."
+      "already_configured": "Rugby Team Tracker is already configured."
     }
   },
   "options": {
@@ -35,7 +35,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to RugbyPass.",
+      "cannot_connect": "Failed to connect to the data source.",
       "no_teams": "No teams were found for the selected competitions."
     }
   },

@@ -16,8 +16,8 @@ from homeassistant.util import dt as dt_util
 from .client import (
     COMPETITIONS,
     WORLD_RANKING_COMPETITIONS,
-    RugbyPassClient,
-    RugbyPassError,
+    RugbyTrackerClient,
+    RugbyTrackerError,
 )
 from .const import DOMAIN
 from .models import Game, Team
@@ -46,7 +46,7 @@ STANDINGS_TIMEOUT = 8
 _WORLD = "<world rankings>"
 _NOT_IN_PLAY = ("result", "postponed", "canceled")
 
-type RugbyPassConfigEntry = ConfigEntry[RugbyPassCoordinator]
+type RugbyTrackerConfigEntry = ConfigEntry[RugbyTrackerCoordinator]
 
 
 def entry_teams(entry: ConfigEntry) -> list[int]:
@@ -58,7 +58,7 @@ def entry_teams(entry: ConfigEntry) -> list[int]:
 def is_in_play(game: Game, now: datetime) -> bool:
     """Past kick-off (by up to 3 h) and not finished or called off.
 
-    RugbyPass can take a while to flip ``live`` after kick-off; such a game
+    The data source can take a while to flip ``live`` after kick-off; such a game
     must be polled at the live rate rather than ignored.
     """
     return (
@@ -97,13 +97,13 @@ def retry_interval(failures: int, computed: timedelta) -> timedelta:
     return min(backoff, computed)
 
 
-class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
+class RugbyTrackerCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
     """Polls competitions and selects games for followed teams."""
 
     config_entry: ConfigEntry
 
     def __init__(
-        self, hass: HomeAssistant, entry: RugbyPassConfigEntry, client: RugbyPassClient
+        self, hass: HomeAssistant, entry: RugbyTrackerConfigEntry, client: RugbyTrackerClient
     ) -> None:
         super().__init__(
             hass,
@@ -195,11 +195,11 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
 
     async def _async_update_data(self) -> dict[int, TeamGames]:
         competitions = list(self.config_entry.data.get("competitions", []))
-        errors: dict[str, RugbyPassError] = {}
+        errors: dict[str, RugbyTrackerError] = {}
         for slug in competitions:
             try:
                 games = await self.client.fetch_competition(slug)
-            except RugbyPassError as err:
+            except RugbyTrackerError as err:
                 errors[slug] = err
                 self._competition_failures[slug] = (
                     self._competition_failures.get(slug, 0) + 1

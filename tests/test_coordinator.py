@@ -10,14 +10,14 @@ import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
-from custom_components.rugbypass.const import DOMAIN
-from custom_components.rugbypass.coordinator import (
-    RugbyPassCoordinator,
+from custom_components.rugby_team_tracker.client import RugbyTrackerClient, RugbyTrackerError
+from custom_components.rugby_team_tracker.const import DOMAIN
+from custom_components.rugby_team_tracker.coordinator import (
+    RugbyTrackerCoordinator,
     compute_interval,
     entry_teams,
 )
-from custom_components.rugbypass.models import Game, Team
+from custom_components.rugby_team_tracker.models import Game, Team
 
 NOW = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
 T1 = Team(1, "One", "one", "")
@@ -102,7 +102,7 @@ def make(hass, teams=(1,), comps=("a",), options=None):
         options=options or {},
     )
     entry.add_to_hass(hass)
-    return RugbyPassCoordinator(hass, entry, RugbyPassClient(None))
+    return RugbyTrackerCoordinator(hass, entry, RugbyTrackerClient(None))
 
 
 def test_entry_teams_options_override(hass):
@@ -121,8 +121,8 @@ async def test_merges_competitions(hass):
 
     coord = make(hass, comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert coord.last_update_success
@@ -139,8 +139,8 @@ async def test_interval_updated(hass):
 
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert coord.update_interval == timedelta(seconds=60)
@@ -155,8 +155,8 @@ async def test_only_followed_games_drive_interval(hass):
 
     coord = make(hass, teams=(1,))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert coord.update_interval == timedelta(hours=6)
@@ -167,13 +167,13 @@ async def test_failure_handling(hass):
 
     async def fetch(self, slug):
         if state["fail"]:
-            raise RugbyPassError("boom")
+            raise RugbyTrackerError("boom")
         return [g(1, timedelta(days=1))]
 
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         good = coord.data
@@ -206,10 +206,10 @@ async def test_failure_handling(hass):
 
 async def test_first_refresh_failure_raises(hass):
     async def fetch(self, slug):
-        raise RugbyPassError("boom")
+        raise RugbyTrackerError("boom")
 
     coord = make(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch):
         with pytest.raises(UpdateFailed):
             await coord._async_update_data()
         await coord.async_refresh()
@@ -262,14 +262,14 @@ async def _failure_sequence(hass, game, n):
 
     async def fetch(self, slug):
         if state["fail"]:
-            raise RugbyPassError("boom")
+            raise RugbyTrackerError("boom")
         return [game]
 
     coord = make(hass)
     seen = []
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         normal = coord.update_interval
@@ -311,7 +311,7 @@ async def test_backoff_while_live_stays_at_live_interval(hass):
 def _comp_fetch(results, failing):
     async def fetch(self, slug):
         if slug in failing:
-            raise RugbyPassError(f"{slug} down")
+            raise RugbyTrackerError(f"{slug} down")
         return results[slug]
 
     return fetch
@@ -324,8 +324,8 @@ async def test_one_competition_failing_keeps_its_games(hass):
     failing: set[str] = set()
     coord = make(hass, teams=(1, 3), comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, failing)),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _comp_fetch(results, failing)),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         assert coord.data[3].next.id == 2
@@ -350,8 +350,8 @@ async def test_all_competitions_failing_counts_as_failure(hass):
     failing: set[str] = set()
     coord = make(hass, teams=(1, 3), comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, failing)),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _comp_fetch(results, failing)),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         good = coord.data
@@ -366,7 +366,7 @@ async def test_all_competitions_failing_counts_as_failure(hass):
 
 async def test_all_competitions_failing_first_refresh_raises(hass):
     coord = make(hass, comps=("a", "b"))
-    with patch.object(RugbyPassClient, "fetch_competition", _comp_fetch({}, {"a", "b"})):
+    with patch.object(RugbyTrackerClient, "fetch_competition", _comp_fetch({}, {"a", "b"})):
         with pytest.raises(UpdateFailed):
             await coord._async_update_data()
 
@@ -375,8 +375,8 @@ async def test_competition_failing_three_times_without_data_fails(hass):
     results = {"a": [g(1, timedelta(days=1))]}
     coord = make(hass, teams=(1, 3), comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, {"b"})),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _comp_fetch(results, {"b"})),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         assert coord.last_update_success
@@ -403,7 +403,7 @@ def _standings_fetch(tables, calls, failing=()):
     async def fetch(self, slug):
         calls.append(slug)
         if slug in failing:
-            raise RugbyPassError(f"{slug} has no standings page")
+            raise RugbyTrackerError(f"{slug} has no standings page")
         return dict(tables[slug])
 
     return fetch
@@ -418,9 +418,9 @@ async def test_standings_fetched_on_first_refresh_and_rank(hass):
     tables = {"a": {1: 3, 2: 7}, "b": {3: 1}}
     coord = make(hass, comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls)),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_standings", _standings_fetch(tables, calls)),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert sorted(calls) == ["a", "b"]
@@ -439,9 +439,9 @@ async def test_standings_cached_for_an_hour(hass):
     clock = _Clock(NOW)
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls)),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_standings", _standings_fetch(tables, calls)),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         assert calls == ["a"]
@@ -462,13 +462,13 @@ async def test_no_standings_page_not_rerequested_within_the_hour(hass):
     clock = _Clock(NOW)
     coord = make(hass, comps=("a",))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_standings",
             _standings_fetch({"a": {}}, calls),
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         for minutes in (0, 1, 10, 30, 59):
             clock.now = NOW + timedelta(minutes=minutes)
@@ -488,11 +488,11 @@ async def test_failed_standings_retried_after_ten_minutes(hass):
     tables = {"a": {1: 4}}
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls, failing)
+            RugbyTrackerClient, "fetch_standings", _standings_fetch(tables, calls, failing)
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         assert calls == ["a"]
@@ -521,11 +521,11 @@ async def test_failed_standings_keep_last_good_table_until_retry_succeeds(hass):
     tables = {"a": {1: 2}}
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls, failing)
+            RugbyTrackerClient, "fetch_standings", _standings_fetch(tables, calls, failing)
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         failing.add("a")
@@ -550,12 +550,12 @@ async def test_unexpected_standings_exception_is_not_fatal(hass):
 
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         interval = coord.update_interval
-        with patch.object(RugbyPassClient, "fetch_standings", boom):
+        with patch.object(RugbyTrackerClient, "fetch_standings", boom):
             coord._standings_next.clear()  # make standings due now
             await coord.async_refresh()
     assert coord.last_update_success
@@ -578,10 +578,10 @@ async def test_hanging_standings_fetch_times_out_without_failing(hass):
     clock = _Clock(NOW)
     coord = make(hass, comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_standings", hang),
-        patch("custom_components.rugbypass.coordinator.STANDINGS_TIMEOUT", 0.05),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_standings", hang),
+        patch("custom_components.rugby_team_tracker.coordinator.STANDINGS_TIMEOUT", 0.05),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         loop = asyncio.get_running_loop()
         start = loop.time()
@@ -613,9 +613,9 @@ async def test_standings_fetched_after_games(hass):
 
     coord = make(hass, comps=("a", "b"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", games),
-        patch.object(RugbyPassClient, "fetch_standings", standings),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", games),
+        patch.object(RugbyTrackerClient, "fetch_standings", standings),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert order[:2] == ["games:a", "games:b"]
@@ -628,13 +628,13 @@ async def test_standings_failure_is_never_fatal_and_keeps_last_table(hass):
     clock = _Clock(NOW)
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_standings",
             _standings_fetch({"a": {1: 2}}, calls, failing),
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         interval = coord.update_interval
@@ -653,11 +653,11 @@ async def test_standings_failure_is_never_fatal_and_keeps_last_table(hass):
 async def test_standings_failure_on_first_refresh_is_not_fatal(hass):
     coord = make(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient, "fetch_standings", _standings_fetch({}, [], failing={"a"})
+            RugbyTrackerClient, "fetch_standings", _standings_fetch({}, [], failing={"a"})
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         data = await coord._async_update_data()
     assert data[1].next.id == 1
@@ -669,22 +669,22 @@ async def test_standings_not_fetched_for_failing_competition(hass):
     coord = make(hass, comps=("a", "b"))
     with (
         patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_competition",
             _comp_fetch({"a": [g(1, timedelta(days=1))]}, {"b"}),
         ),
         patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_standings",
             _standings_fetch({"a": {1: 1}, "b": {3: 1}}, calls),
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
         assert calls == ["a"]
         # b comes back: its standings are fetched on the next refresh.
         with patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_competition",
             _comp_fetch({"a": [], "b": []}, set()),
         ):
@@ -705,7 +705,7 @@ def _world_fetch(calls, table=None, fail=None):
     async def fetch(self):
         calls.append("world")
         if fail is not None and fail["on"]:
-            raise RugbyPassError("rankings down")
+            raise RugbyTrackerError("rankings down")
         return dict(table if table is not None else WORLD)
 
     return fetch
@@ -728,12 +728,12 @@ async def test_world_rankings_fetched_hourly_for_world_competitions(hass):
         comps=("rugby-world-cup", "nations-championship", "internationals", "top-14"),
     )
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch(world_calls)),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", _world_fetch(world_calls)),
         patch.object(
-            RugbyPassClient, "fetch_standings", _record_standings(standings_calls)
+            RugbyTrackerClient, "fetch_standings", _record_standings(standings_calls)
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         assert world_calls == ["world"]  # once, however many world competitions
@@ -754,12 +754,12 @@ async def test_world_rankings_not_fetched_for_league_competitions_only(hass):
     standings_calls: list[str] = []
     coord = make(hass, comps=("united-rugby-championship", "six-nations"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch(world_calls)),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", _world_fetch(world_calls)),
         patch.object(
-            RugbyPassClient, "fetch_standings", _record_standings(standings_calls)
+            RugbyTrackerClient, "fetch_standings", _record_standings(standings_calls)
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert world_calls == []
@@ -774,11 +774,11 @@ async def test_world_rankings_failure_retried_after_ten_minutes(hass):
     clock = _Clock(NOW)
     coord = make(hass, comps=("internationals",))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
         patch.object(
-            RugbyPassClient, "fetch_world_rankings", _world_fetch(calls, table, fail)
+            RugbyTrackerClient, "fetch_world_rankings", _world_fetch(calls, table, fail)
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         await coord.async_refresh()
         interval = coord.update_interval
@@ -809,9 +809,9 @@ async def test_world_rankings_unexpected_exception_not_fatal(hass):
 
     coord = make(hass, comps=("nations-championship",))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", boom),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", boom),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert coord.last_update_success
@@ -837,11 +837,11 @@ async def test_hanging_world_rankings_capped_with_standings_concurrently(hass):
     clock = _Clock(NOW)
     coord = make(hass, comps=("internationals", "top-14"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", hang_world),
-        patch.object(RugbyPassClient, "fetch_standings", hang_standings),
-        patch("custom_components.rugbypass.coordinator.STANDINGS_TIMEOUT", 0.05),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", hang_world),
+        patch.object(RugbyTrackerClient, "fetch_standings", hang_standings),
+        patch("custom_components.rugby_team_tracker.coordinator.STANDINGS_TIMEOUT", 0.05),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", clock),
     ):
         loop = asyncio.get_running_loop()
         start = loop.time()
@@ -871,9 +871,9 @@ async def test_world_rankings_fetched_after_games(hass):
 
     coord = make(hass, comps=("internationals", "rugby-world-cup"))
     with (
-        patch.object(RugbyPassClient, "fetch_competition", games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", world),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch.object(RugbyTrackerClient, "fetch_competition", games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", world),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     assert order == ["games:internationals", "games:rugby-world-cup", "world"]
@@ -884,14 +884,14 @@ async def test_rank_source_per_competition(hass):
     leinster = Team(5356, "Leinster", "leinster", "")
     ireland = Team(20, "Ireland", "ireland", "")
     with (
-        patch.object(RugbyPassClient, "fetch_competition", _games),
-        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch([])),
+        patch.object(RugbyTrackerClient, "fetch_competition", _games),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", _world_fetch([])),
         patch.object(
-            RugbyPassClient,
+            RugbyTrackerClient,
             "fetch_standings",
             _record_standings([], {"united-rugby-championship": {5356: 6, 20: 99}}),
         ),
-        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+        patch("custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW),
     ):
         await coord.async_refresh()
     # World competitions: by slug from the world ranking, never by id.

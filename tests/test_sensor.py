@@ -11,10 +11,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
-from custom_components.rugbypass.const import DOMAIN
-from custom_components.rugbypass.models import Team
-from custom_components.rugbypass.sensor import game_attributes
+from custom_components.rugby_team_tracker.client import RugbyTrackerClient, RugbyTrackerError
+from custom_components.rugby_team_tracker.const import DOMAIN
+from custom_components.rugby_team_tracker.models import Team
+from custom_components.rugby_team_tracker.sensor import game_attributes
 
 from .test_coordinator import NOW, T1, T2, T3, g
 
@@ -28,7 +28,7 @@ ATTR_KEYS = {
 @pytest.fixture(autouse=True)
 def frozen_now():
     with patch(
-        "custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW
+        "custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW
     ):
         yield
 
@@ -50,12 +50,12 @@ async def setup(
 
     async def fetch_standings(self, slug):
         if standings is None or slug not in standings:
-            raise RugbyPassError(f"{slug}: no standings page")
+            raise RugbyTrackerError(f"{slug}: no standings page")
         return standings[slug]
 
     async def fetch_world_rankings(self):
         if world is None:
-            raise RugbyPassError("no world rankings")
+            raise RugbyTrackerError("no world rankings")
         return world
 
     entry = MockConfigEntry(
@@ -68,9 +68,9 @@ async def setup(
     )
     entry.add_to_hass(hass)
     with (
-        patch.object(RugbyPassClient, "fetch_competition", fetch),
-        patch.object(RugbyPassClient, "fetch_standings", fetch_standings),
-        patch.object(RugbyPassClient, "fetch_world_rankings", fetch_world_rankings),
+        patch.object(RugbyTrackerClient, "fetch_competition", fetch),
+        patch.object(RugbyTrackerClient, "fetch_standings", fetch_standings),
+        patch.object(RugbyTrackerClient, "fetch_world_rankings", fetch_world_rankings),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -158,16 +158,16 @@ async def test_two_teams_two_devices(hass):
     assert devs.async_get_device(identifiers={(DOMAIN, "2")}).name == "Two"
 
 
-async def test_device_links_to_rugbypass_website(hass):
+async def test_device_links_to_data_source_website(hass):
     await setup(hass, [g(1, timedelta(days=1))])
     device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "1")})
-    assert device.manufacturer == "RugbyPass"
+    assert device.manufacturer == "Rugby Team Tracker"
     assert device.configuration_url == "https://www.rugbypass.com"
 
 
 async def test_options_teams_and_names_override(hass):
     entry = await setup(hass, [g(1, timedelta(days=1))])
-    with patch.object(RugbyPassClient, "fetch_competition", _fetch_one):
+    with patch.object(RugbyTrackerClient, "fetch_competition", _fetch_one):
         hass.config_entries.async_update_entry(
             entry, options={"teams": [2], "team_names": {"2": "Two"}}
         )
@@ -187,7 +187,7 @@ async def test_dropped_team_device_removed(hass):
     devs = dr.async_get(hass)
     assert devs.async_get_device(identifiers={(DOMAIN, "1")}) is not None
     assert devs.async_get_device(identifiers={(DOMAIN, "2")}) is not None
-    with patch.object(RugbyPassClient, "fetch_competition", _fetch_one):
+    with patch.object(RugbyTrackerClient, "fetch_competition", _fetch_one):
         hass.config_entries.async_update_entry(
             entry, options={"teams": [1], "team_names": {"1": "One"}}
         )

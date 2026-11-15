@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Tag must match manifest version
         run: |
-          manifest=$(python3 -c "import json; print(json.load(open('custom_components/rugbypass/manifest.json'))['version'])")
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/rugby_team_tracker/manifest.json'))['version'])")
           tag="${GITHUB_REF_NAME#v}"
           if [ "$manifest" != "$tag" ]; then
             echo "Tag ${GITHUB_REF_NAME} does not match manifest version ${manifest}" >&2
@@ -27,9 +27,9 @@ jobs:
       - run: pip install -r requirements_test.txt
       - run: pytest -v
       - name: Zip the integration
-        working-directory: custom_components/rugbypass
-        run: zip -r ../../rugbypass.zip . -x "__pycache__/*" "*.pyc"
+        working-directory: custom_components/rugby_team_tracker
+        run: zip -r ../../rugby_team_tracker.zip . -x "__pycache__/*" "*.pyc"
       - uses: softprops/action-gh-release@v2
         with:
-          files: rugbypass.zip
+          files: rugby_team_tracker.zip
           generate_release_notes: true

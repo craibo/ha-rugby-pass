@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from custom_components.rugbypass.models import Game, Team
-from custom_components.rugbypass.selection import (
+from custom_components.rugby_team_tracker.models import Game, Team
+from custom_components.rugby_team_tracker.selection import (
     TeamGames,
     merge_games,
     select_team_games,
