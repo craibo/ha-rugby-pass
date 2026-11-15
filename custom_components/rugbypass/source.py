@@ -13,6 +13,9 @@ from .models import Game, Team
 # RugbyPass embeds the season's games as JSON text inside a hidden div:
 #   <div id="current-game-days" style="display: none;">[ {day}, ... ]</div>
 # day = {"epoch", "title", "tournaments": [ {"title", "order", "games": [...]} ]}
+# A sibling div, "current-final-days", holds play-off placeholders with no
+# teams (only id/epoch/round/venue "TBD"); it is deliberately not read, as
+# those are not followable games until RugbyPass moves them into game-days.
 GAME_DAYS_MARKER = 'id="current-game-days"'
 
 _DECODER = json.JSONDecoder()
@@ -33,10 +36,19 @@ class GameSource(Protocol):
 def parse_games(page: str) -> list[Game]:
     """Parse a RugbyPass fixtures-results page into games."""
     games: list[Game] = []
+    found = 0
     for raw in _iter_raw_games(_extract_game_days(page)):
-        game = _to_game(raw)
+        found += 1
+        try:
+            game = _to_game(raw)
+        except (KeyError, TypeError, ValueError) as err:
+            raise ParseError(f"Malformed game {raw.get('id')!r}: {err}") from err
         if game is not None:
             games.append(game)
+    if found and not games:
+        # Games were present but none had the expected shape: the page
+        # format has probably changed, which must not look like "no games".
+        raise ParseError(f"None of {found} games could be mapped")
     return games
 
 
@@ -50,17 +62,21 @@ def _extract_game_days(page: str) -> list[Any]:
         raise ParseError("Malformed game data element")
     start = tag_end + 1
     end = page.find("</div>", start)
-    escaped = page[start:end] if end != -1 else page[start:]
+    element_text = page[start:end] if end != -1 else page[start:]
     # Raw JSON is decoded in place (bracket-aware, stops at the array's end);
-    # an HTML-entity-escaped variant is tried as a fallback.
-    for text in (page[start:], html_lib.unescape(escaped)):
+    # an HTML-entity-escaped variant of the element text is the fallback.
+    decoded_non_list = False
+    for text in (page[start:], html_lib.unescape(element_text)):
         try:
             data, _ = _DECODER.raw_decode(text.lstrip())
         except json.JSONDecodeError:
             continue
         if isinstance(data, list):
             return data
-    raise ParseError("Inline game data is not a JSON array")
+        decoded_non_list = True
+    if decoded_non_list:
+        raise ParseError("Inline game data is not a JSON array")
+    raise ParseError("Inline game data is malformed or truncated JSON")
 
 
 def _iter_raw_games(days: list[Any]) -> Iterator[dict[str, Any]]:
@@ -99,6 +115,13 @@ def _score(value: Any) -> int | None:
         return None
 
 
+def _minute(value: Any) -> int:
+    """Match minute; a missing value means 0, a malformed one is an error."""
+    if value is None or value == "":
+        return 0
+    return int(value)
+
+
 def _status(raw: dict[str, Any]) -> str:
     if raw.get("postponed"):
         return "postponed"
@@ -134,6 +157,6 @@ def _to_game(raw: dict[str, Any]) -> Game | None:
         competition=str(raw.get("tournamentTitle") or ""),
         status=status,
         live=live,
-        minute=_score(raw.get("minute")) or 0,
+        minute=_minute(raw.get("minute")),
         url=str(raw.get("url") or ""),
     )

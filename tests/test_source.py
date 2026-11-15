@@ -5,12 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.rugbypass.models import Game
+from custom_components.rugbypass.const import PERIODS
+from custom_components.rugbypass.models import Game, derive_period
 from custom_components.rugbypass.source import GameSource, ParseError, parse_games
 
 FIXTURE = Path(__file__).parent / "fixtures" / "urc_fixtures.html"
 
 CARDIFF_ID = 4471
+SECOND_HALF = PERIODS[2]
 
 
 @pytest.fixture(name="games")
@@ -95,7 +97,7 @@ def test_no_inline_json_raises():
 
 def test_malformed_inline_json_raises():
     html = '<div id="current-game-days" style="display: none;">[{"epoch":</div>'
-    with pytest.raises(ParseError):
+    with pytest.raises(ParseError, match="malformed or truncated"):
         parse_games(html)
 
 
@@ -106,3 +108,78 @@ def test_game_source_is_protocol():
 
     source: GameSource = Fake()
     assert isinstance(source, GameSource)
+
+
+def _fixture_html() -> str:
+    return FIXTURE.read_text(encoding="utf-8")
+
+
+def test_live_game():
+    # Assumed live shape (no live game on the real page yet).
+    html = _fixture_html()
+    old = '"homeScore":0,"awayScore":0,"round":"Round 6"'
+    start = html.index('{"id":292628,')
+    end = html.index('"date":', start)
+    game_json = html[start:end]
+    assert old in game_json
+    live_json = (
+        game_json.replace(old, '"homeScore":17,"awayScore":10,"round":"Round 6"')
+        .replace(
+            '"status":"fixture","upcoming":true,"live":false',
+            '"status":"live","upcoming":false,"live":true',
+        )
+        .replace('"minute":0,', '"minute":63,')
+    )
+    assert live_json != game_json
+    game = by_id(parse_games(html.replace(game_json, live_json)), 292628)
+    assert game.live is True
+    assert game.home_score == 17
+    assert game.away_score == 10
+    assert game.minute == 63
+    assert derive_period(game) == SECOND_HALF
+
+
+def test_missing_minute_is_zero():
+    html = _fixture_html().replace('"minute":80,', "", 1)
+    assert by_id(parse_games(html), 292585).minute == 0
+
+
+def test_non_numeric_game_id_raises():
+    html = _fixture_html().replace('"id":292585,', '"id":"abc",', 1)
+    with pytest.raises(ParseError):
+        parse_games(html)
+
+
+def test_non_numeric_team_id_raises():
+    html = _fixture_html().replace('"id":5483,', '"id":"connacht",', 1)
+    with pytest.raises(ParseError):
+        parse_games(html)
+
+
+def test_games_present_but_none_mappable_raises():
+    html = _fixture_html().replace('"homeTeam":', '"home":')
+    with pytest.raises(ParseError):
+        parse_games(html)
+
+
+def test_empty_games_array_is_empty_list():
+    html = (
+        '<div id="current-game-days" style="display: none;">'
+        '[{"epoch":1790361900,"title":"Sat 26 Sep, 2026","tournaments":'
+        '[{"title":"United Rugby Championship","order":0,"games":[]}]}]</div>'
+    )
+    assert parse_games(html) == []
+
+
+def test_html_entity_escaped_json():
+    html = _fixture_html()
+    start = html.index(">", html.index('id="current-game-days"')) + 1
+    end = html.index("</div>", start)
+    escaped = html[:start] + html[start:end].replace('"', "&quot;") + html[end:]
+    assert len(parse_games(escaped)) == 14
+
+
+def test_non_array_json_raises():
+    html = '<div id="current-game-days" style="display: none;">{"a":1}</div>'
+    with pytest.raises(ParseError, match="not a JSON array"):
+        parse_games(html)
