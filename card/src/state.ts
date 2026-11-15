@@ -16,6 +16,10 @@ export type CardView = {
   badge?: string;
   /** Upcoming only: the kick-off date, shown above the time (headline). */
   dateLine?: string;
+  /** Upcoming only: the venue, shown under the kick-off time. */
+  venue?: string;
+  /** Live and final only: absolute RugbyPass match page (validated). */
+  matchUrl?: string;
 };
 
 const EMPTY: CardView = {
@@ -31,6 +35,29 @@ const str = (v: unknown): string | undefined =>
   typeof v === "string" && v !== "" ? v : undefined;
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
+
+const RUGBYPASS_HOSTS = new Set(["www.rugbypass.com", "rugbypass.com"]);
+
+/** A RugbyPass https URL (normalised), else undefined. Never throws. */
+export function safeMatchUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  try {
+    const u = new URL(value);
+    if (u.protocol !== "https:" || !RUGBYPASS_HOSTS.has(u.hostname)) return undefined;
+    if (u.username !== "" || u.password !== "" || u.port !== "") return undefined;
+    return u.href;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Accessible name for a match link. */
+export function matchLinkLabel(home: string, away: string): string {
+  return `Open the match on RugbyPass: ${home} v ${away}`;
+}
+
+const venueOf = (v: unknown): string | undefined =>
+  typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
 
 const ORDINAL_SUFFIX: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
 
@@ -118,7 +145,13 @@ export function buildView(
 
     switch (period) {
       case "Kick off":
-        return { mode: "upcoming", home, away, ...formatKickoff(a.kickoff, locale, timeZone) };
+        return {
+          mode: "upcoming",
+          home,
+          away,
+          ...formatKickoff(a.kickoff, locale, timeZone),
+          venue: venueOf(a.venue),
+        };
       case "Postponed":
       case "Cancelled":
         return {
@@ -127,6 +160,7 @@ export function buildView(
           away,
           ...formatKickoff(a.kickoff, locale, timeZone),
           badge: period,
+          venue: venueOf(a.venue),
         };
       case "First Half":
       case "Second Half": {
@@ -137,10 +171,18 @@ export function buildView(
           away,
           headline: score,
           badge: minute === undefined ? period : `${period} ${minute}'`,
+          matchUrl: safeMatchUrl(a.match_url),
         };
       }
       case "Result":
-        return { mode: "final", home, away, headline: score, badge: "Full time" };
+        return {
+          mode: "final",
+          home,
+          away,
+          headline: score,
+          badge: "Full time",
+          matchUrl: safeMatchUrl(a.match_url),
+        };
       default:
         return empty();
     }

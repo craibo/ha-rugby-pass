@@ -1,5 +1,5 @@
 import { entitiesChanged, pickStubEntity } from "./editor-helpers";
-import { buildView, rankFields, type CardView, type HassEntity } from "./state";
+import { buildView, rankFields, safeMatchUrl, type CardView, type HassEntity } from "./state";
 
 export type TeamConfig = {
   type?: string;
@@ -17,9 +17,15 @@ export type PreviousRow = {
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd". */
   rankLabel?: string;
+  /** Validated RugbyPass match page, if known. */
+  matchUrl?: string;
   score: string;
   outcome: "win" | "loss" | "draw" | "unknown";
 };
+
+/** Accessible name for a previous-result row link. */
+export const previousLinkLabel = (opposition: string): string =>
+  `Open the match against ${opposition} on RugbyPass`;
 
 export type TeamCardView = { top: CardView; previous: PreviousRow[]; heading?: string };
 
@@ -105,6 +111,7 @@ function previousRow(
         a.home_away === "home" ? a.away_rank : a.home_away === "away" ? a.home_rank : undefined,
         locale,
       ),
+      matchUrl: safeMatchUrl(a.match_url),
       score: state || "Result unavailable",
       outcome,
     };

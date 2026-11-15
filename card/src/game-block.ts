@@ -1,5 +1,5 @@
 import { html, css, nothing, type TemplateResult } from "lit";
-import type { CardView, TeamView } from "./state";
+import { matchLinkLabel, type CardView, type TeamView } from "./state";
 
 function team(t: TeamView): TemplateResult {
   return html`<div class="team">
@@ -15,17 +15,27 @@ export function gameBlock(v: CardView): TemplateResult {
   if (v.mode === "empty") {
     return html`<div class="empty">${v.headline}</div>`;
   }
-  return html`<div class="game ${v.mode}">
+  const body = html`<div class="game ${v.mode}">
     <div class="row">
       ${team(v.home)}
       <div class="centre">
         ${v.dateLine ? html`<div class="dateline">${v.dateLine}</div>` : nothing}
         <div class="headline">${v.headline}</div>
+        ${v.venue ? html`<div class="venue">${v.venue}</div>` : nothing}
         ${v.badge ? html`<div class="badge">${v.badge}</div>` : nothing}
       </div>
       ${team(v.away)}
     </div>
   </div>`;
+  if (!v.matchUrl) return body;
+  return html`<a
+    class="game-link"
+    href=${v.matchUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label=${matchLinkLabel(v.home.name, v.away.name)}
+    >${body}</a
+  >`;
 }
 
 export const gameBlockStyles = css`
@@ -80,6 +90,29 @@ export const gameBlockStyles = css`
       font-size: 0.85em;
       color: var(--secondary-text-color);
       white-space: nowrap;
+    }
+    .venue {
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .game-link,
+    .prev-row a.prev-link {
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+    .game-link {
+      display: block;
+    }
+    .game-link:hover,
+    .game-link:focus-visible,
+    .prev-row a.prev-link:hover,
+    .prev-row a.prev-link:focus-visible {
+      background: var(--secondary-background-color);
     }
     .badge {
       display: inline-block;

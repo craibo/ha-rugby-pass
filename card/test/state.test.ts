@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildView, formatRank, type HassEntity } from "../src/state";
+import { buildView, formatRank, safeMatchUrl, matchLinkLabel, type HassEntity } from "../src/state";
 
 const base = {
   opposition: "Wallabies",
@@ -173,4 +173,57 @@ describe("buildView ranks", () => {
       expect(v.away.rankLabel).toBeUndefined();
     }
   });
+});
+
+const GOOD = "https://www.rugbypass.com/live/a-vs-b/?g=1";
+
+describe("safeMatchUrl", () => {
+  it("accepts rugbypass https urls and normalises", () => {
+    expect(safeMatchUrl(GOOD)).toBe(GOOD);
+    expect(safeMatchUrl("https://rugbypass.com/live/x/")).toBe("https://rugbypass.com/live/x/");
+    expect(safeMatchUrl("https://WWW.RugbyPass.com")).toBe("https://www.rugbypass.com/");
+  });
+  it("rejects everything else without throwing", () => {
+    const bad: unknown[] = [
+      undefined, null, 1, true, {}, [GOOD], "", " ", "/live/x/", "live/x", "http://www.rugbypass.com/live/x/",
+      "javascript:alert(1)", "data:text/html,hi", "https://evil.example/", "https://www.rugbypass.com.evil.example/",
+      "https://evil.example/www.rugbypass.com", "https://sub.rugbypass.com/", "https://user:pw@www.rugbypass.com/",
+      "https://user@www.rugbypass.com/", "//www.rugbypass.com/x", "ftp://www.rugbypass.com/",
+      "https://www.rugbypass.com@evil.example/",
+    ];
+    for (const b of bad) expect(safeMatchUrl(b), String(b)).toBeUndefined();
+  });
+});
+
+describe("buildView matchUrl and venue", () => {
+  const live = { period: "First Half", minute: 3, home_score: 0, away_score: 0, match_url: GOOD };
+  it("matchUrl for live and final only", () => {
+    expect(buildView(ent(live), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ ...live, period: "Result" }), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
+    expect(buildView(ent({ period: "Postponed", match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
+    expect(buildView(ent({ period: "Cancelled", match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
+    expect(buildView({ state: "unknown", attributes: { match_url: GOOD } }, "en", "UTC").matchUrl).toBeUndefined();
+  });
+  it("rejects unsafe or mistyped urls without throwing", () => {
+    for (const bad of ["javascript:alert(1)", "http://www.rugbypass.com/x", 5, null, {}, ""]) {
+      expect(buildView(ent({ ...live, match_url: bad }), "en", "UTC").matchUrl).toBeUndefined();
+    }
+    expect(buildView(ent({ ...live, match_url: undefined }), "en", "UTC").mode).toBe("live");
+  });
+  it("venue only for upcoming, trimmed", () => {
+    expect(buildView(ent({ venue: "  Murrayfield " }), "en", "UTC").venue).toBe("Murrayfield");
+    expect(buildView(ent({ ...live, venue: "Murrayfield" }), "en", "UTC").venue).toBeUndefined();
+    expect(buildView(ent({ period: "Result", home_score: 1, away_score: 0 }), "en", "UTC").venue).toBeUndefined();
+    expect(buildView(ent({ period: "Postponed" }), "en", "UTC").venue).toBe("Murrayfield");
+  });
+  it("ignores empty or non-string venue", () => {
+    for (const bad of ["", "   ", null, undefined, 3, {}, ["x"]]) {
+      expect(buildView(ent({ venue: bad }), "en", "UTC").venue).toBeUndefined();
+    }
+  });
+});
+
+it("matchLinkLabel names both teams", () => {
+  expect(matchLinkLabel("Scotland", "Wales")).toBe("Open the match on RugbyPass: Scotland v Wales");
 });

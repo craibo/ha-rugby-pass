@@ -312,3 +312,26 @@ describe("registerCard", () => {
     expect(w.customCards?.map((c) => c.type)).toEqual(["a", "b"]);
   });
 });
+
+describe("buildTeamView previous matchUrl", () => {
+  const U = "https://www.rugbypass.com/live/a-vs-b/?g=1";
+  it("per row, safe only", () => {
+    const v = buildTeamView(
+      {
+        p1: prev("W 1–0", { match_url: U }),
+        p2: prev("W 1–0", { match_url: "javascript:alert(1)" }),
+        p3: prev("W 1–0", { match_url: 7 }),
+        p4: prev("W 1–0"),
+      },
+      cfg,
+      "en",
+      "UTC",
+    );
+    expect(v.previous.map((r) => r.matchUrl)).toEqual([U, undefined, undefined, undefined]);
+  });
+  it("top block carries matchUrl only when live", () => {
+    const l = { ...live, attributes: { ...live.attributes, match_url: U } };
+    expect(buildTeamView({ c: l, n: next }, cfg, "en", "UTC").top.matchUrl).toBe(U);
+    expect(buildTeamView({ c: none, n: next }, cfg, "en", "UTC").top.matchUrl).toBeUndefined();
+  });
+});
