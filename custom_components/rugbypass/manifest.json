@@ -6,7 +6,7 @@
   "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/craibo/ha-rugby-pass",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/craibo/ha-rugby-pass",
+  "issue_tracker": "https://github.com/craibo/ha-rugby-pass/issues",
   "requirements": [],
   "version": "0.1.0"
 }
