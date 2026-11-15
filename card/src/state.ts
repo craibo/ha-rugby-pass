@@ -174,6 +174,16 @@ export function buildView(
           matchUrl: safeMatchUrl(a.match_url),
         };
       }
+      case "Half Time":
+        // The minute is frozen during the break: no clock in the badge.
+        return {
+          mode: "live",
+          home,
+          away,
+          headline: score,
+          badge: period,
+          matchUrl: safeMatchUrl(a.match_url),
+        };
       case "Result":
         return {
           mode: "final",

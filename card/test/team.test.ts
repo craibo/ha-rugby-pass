@@ -71,6 +71,12 @@ describe("buildTeamView top", () => {
     const v = buildTeamView({ c: live, n: next }, cfg, "en", "UTC");
     expect(v.top.mode).toBe("live");
   });
+  it("treats half time as the current live game", () => {
+    const ht = ent("Half Time", { period: "Half Time", minute: 41, home_score: 12, away_score: 5 });
+    const v = buildTeamView({ c: ht, n: next }, cfg, "en", "UTC");
+    expect(v.top.mode).toBe("live");
+    expect(v.top.badge).toBe("Half Time");
+  });
   it("falls back to next", () => {
     const v = buildTeamView({ c: none, n: next }, cfg, "en", "UTC");
     expect(v.top.mode).toBe("upcoming");
