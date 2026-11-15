@@ -1,0 +1,11 @@
+{
+  "domain": "rugbypass",
+  "name": "RugbyPass",
+  "codeowners": ["@craibo"],
+  "config_flow": true,
+  "documentation": "https://github.com/craibo/ha-rugby-pass",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/craibo/ha-rugby-pass",
+  "requirements": [],
+  "version": "0.1.0"
+}
