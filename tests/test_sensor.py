@@ -13,7 +13,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.rugbypass.client import RugbyPassClient
 from custom_components.rugbypass.const import DOMAIN
-from custom_components.rugbypass.models import Game
 from custom_components.rugbypass.sensor import game_attributes
 
 from .test_coordinator import NOW, T1, T2, T3, g
@@ -143,9 +142,7 @@ async def test_two_teams_two_devices(hass):
 
 async def test_options_teams_and_names_override(hass):
     entry = await setup(hass, [g(1, timedelta(days=1))])
-    with patch.object(
-        RugbyPassClient, "fetch_competition", lambda self, slug: _co([g(1, timedelta(days=1))])
-    ):
+    with patch.object(RugbyPassClient, "fetch_competition", _fetch_one):
         hass.config_entries.async_update_entry(
             entry, options={"teams": [2], "team_names": {"2": "Two"}}
         )
@@ -155,8 +152,25 @@ async def test_options_teams_and_names_override(hass):
     assert {e.unique_id.split("_")[0] for e in ents} == {"2"}
 
 
-async def _co(v):
-    return v
+async def _fetch_one(self, slug):
+    return [g(1, timedelta(days=1))]
+
+
+async def test_dropped_team_device_removed(hass):
+    games = [g(1, timedelta(days=1), home=T1, away=T2)]
+    entry = await setup(hass, games, teams=(1, 2))
+    devs = dr.async_get(hass)
+    assert devs.async_get_device(identifiers={(DOMAIN, "1")}) is not None
+    assert devs.async_get_device(identifiers={(DOMAIN, "2")}) is not None
+    with patch.object(RugbyPassClient, "fetch_competition", _fetch_one):
+        hass.config_entries.async_update_entry(
+            entry, options={"teams": [1], "team_names": {"1": "One"}}
+        )
+        await hass.async_block_till_done()
+    assert devs.async_get_device(identifiers={(DOMAIN, "2")}) is None
+    assert devs.async_get_device(identifiers={(DOMAIN, "1")}) is not None
+    ents = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    assert {e.unique_id.split("_")[0] for e in ents} == {"1"}
 
 
 def test_game_attributes_home_and_away():
@@ -176,7 +190,3 @@ def test_game_attributes_home_and_away():
     assert home["logos"] == {"home": "", "away": ""}
     assert home["venue"] == "Ground"
     assert game_attributes(replace(game, url="https://x/y"), 1)["match_url"] == "https://x/y"
-
-
-def test_game_type_import():
-    assert Game
