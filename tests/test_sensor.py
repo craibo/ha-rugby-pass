@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
 from custom_components.rugbypass.const import DOMAIN
+from custom_components.rugbypass.models import Team
 from custom_components.rugbypass.sensor import game_attributes
 
 from .test_coordinator import NOW, T1, T2, T3, g
@@ -41,7 +42,9 @@ def result(gid, days, hs, as_, **kw):
     )
 
 
-async def setup(hass, games, teams=(1,), names=None, standings=None):
+async def setup(
+    hass, games, teams=(1,), names=None, standings=None, world=None, comps=("c",)
+):
     async def fetch(self, slug):
         return games
 
@@ -50,10 +53,15 @@ async def setup(hass, games, teams=(1,), names=None, standings=None):
             raise RugbyPassError(f"{slug}: no standings page")
         return standings[slug]
 
+    async def fetch_world_rankings(self):
+        if world is None:
+            raise RugbyPassError("no world rankings")
+        return world
+
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            "competitions": ["c"],
+            "competitions": list(comps),
             "teams": list(teams),
             "team_names": names or {"1": "One", "2": "Two", "3": "Three"},
         },
@@ -62,6 +70,7 @@ async def setup(hass, games, teams=(1,), names=None, standings=None):
     with (
         patch.object(RugbyPassClient, "fetch_competition", fetch),
         patch.object(RugbyPassClient, "fetch_standings", fetch_standings),
+        patch.object(RugbyPassClient, "fetch_world_rankings", fetch_world_rankings),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -214,8 +223,8 @@ def test_game_attributes_ranks_from_lookup():
     game = replace(g(1, timedelta(days=1), home=T1, away=T2), competition_slug="c")
     table = {("c", 1): 4, ("c", 2): 11}
 
-    def ranks(slug, team_id):
-        return table.get((slug, team_id))
+    def ranks(slug, team):
+        return table.get((slug, team.id))
 
     home = game_attributes(game, 1, ranks)
     away = game_attributes(game, 2, ranks)
@@ -263,3 +272,71 @@ async def test_pool_competition_games_have_no_ranks(hass):
     attrs = state(hass, "one_next_game").attributes
     assert attrs["opposition"] == "Two"
     assert attrs["home_rank"] is None and attrs["away_rank"] is None
+
+
+RSA = Team(10, "South Africa", "south-africa", "")
+IRE = Team(11, "Ireland", "ireland", "")
+GIB = Team(12, "Gibraltar", "gibraltar", "")
+LEI = Team(1, "Leinster", "leinster", "")
+MUN = Team(2, "Munster", "munster", "")
+WORLD = {"south-africa": 1, "ireland": 3}
+
+
+@pytest.mark.parametrize(
+    "slug", ["rugby-world-cup", "nations-championship", "internationals"]
+)
+async def test_world_competition_games_use_world_ranking(hass, slug):
+    games = [
+        replace(g(1, timedelta(days=1), home=IRE, away=RSA), competition_slug=slug),
+        replace(result(2, 1, 30, 3, home=IRE, away=GIB), competition_slug=slug),
+    ]
+    # A league table keyed by the same ids must not be used for these.
+    await setup(
+        hass,
+        games,
+        teams=(11,),
+        names={"11": "Ireland"},
+        comps=(slug,),
+        standings={slug: {11: 7, 10: 8}},
+        world=WORLD,
+    )
+    nxt = state(hass, "ireland_next_game").attributes
+    assert nxt["home_rank"] == 3 and nxt["away_rank"] == 1
+    prev = state(hass, "ireland_previous_game_1").attributes
+    assert prev["home_rank"] == 3 and prev["away_rank"] is None  # Gibraltar unranked
+
+
+async def test_team_in_league_and_international_gets_source_per_game(hass):
+    # Leinster (id 1, slug "leinster") plays in the URC and, hypothetically,
+    # an international fixture; each game uses its own competition's source.
+    urc = replace(
+        g(1, timedelta(days=1), home=LEI, away=MUN),
+        competition_slug="united-rugby-championship",
+    )
+    intl = replace(
+        result(2, 1, 20, 10, home=LEI, away=RSA), competition_slug="internationals"
+    )
+    await setup(
+        hass,
+        [urc, intl],
+        names={"1": "Leinster"},
+        comps=("united-rugby-championship", "internationals"),
+        standings={"united-rugby-championship": {1: 6, 2: 9}},
+        world={"leinster": 50, "south-africa": 1},
+    )
+    nxt = state(hass, "leinster_next_game").attributes
+    assert nxt["home_rank"] == 6 and nxt["away_rank"] == 9  # league table
+    prev = state(hass, "leinster_previous_game_1").attributes
+    assert prev["home_rank"] == 50 and prev["away_rank"] == 1  # world ranking
+
+
+async def test_world_rankings_failure_leaves_sensors_working(hass):
+    game = replace(
+        g(1, timedelta(days=1), home=IRE, away=RSA), competition_slug="internationals"
+    )
+    await setup(
+        hass, [game], teams=(11,), names={"11": "Ireland"}, comps=("internationals",)
+    )
+    s = state(hass, "ireland_next_game")
+    assert s.state == (NOW + timedelta(days=1)).isoformat()
+    assert s.attributes["home_rank"] is None and s.attributes["away_rank"] is None

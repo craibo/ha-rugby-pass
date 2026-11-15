@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import RugbyPassConfigEntry, RugbyPassCoordinator, entry_teams
-from .models import Game, derive_period
+from .models import Game, Team, derive_period
 from .selection import MAX_PREVIOUS, TeamGames
 
 BASE_URL = "https://www.rugbypass.com"
@@ -26,7 +26,7 @@ RESULT_UNAVAILABLE = "Result unavailable"
 PARALLEL_UPDATES = 0
 
 
-type RankLookup = Callable[[str, int], int | None]
+type RankLookup = Callable[[str, Team], int | None]
 
 
 def game_attributes(
@@ -34,7 +34,8 @@ def game_attributes(
 ) -> dict[str, Any]:
     """Build the attribute dict for a game from a team's point of view.
 
-    ``ranks(competition_slug, team_id)`` gives league positions, if known.
+    ``ranks(competition_slug, team)`` gives the rank (league position or
+    world ranking, depending on the competition), if known.
     """
     is_home = game.home.id == team_id
     opposition = game.away if is_home else game.home
@@ -55,8 +56,8 @@ def game_attributes(
         "status": game.status,
         "match_url": url,
         "logos": {"home": game.home.logo, "away": game.away.logo},
-        "home_rank": ranks(game.competition_slug, game.home.id) if ranks else None,
-        "away_rank": ranks(game.competition_slug, game.away.id) if ranks else None,
+        "home_rank": ranks(game.competition_slug, game.home) if ranks else None,
+        "away_rank": ranks(game.competition_slug, game.away) if ranks else None,
     }
 
 

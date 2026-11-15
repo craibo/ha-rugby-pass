@@ -3,20 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+from collections.abc import Awaitable
 from datetime import datetime, timedelta
+import logging
+from typing import Any, TypeVar
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import RugbyPassClient, RugbyPassError
+from .client import (
+    COMPETITIONS,
+    WORLD_RANKING_COMPETITIONS,
+    RugbyPassClient,
+    RugbyPassError,
+)
 from .const import DOMAIN
-from .models import Game
+from .models import Game, Team
 from .selection import TeamGames, merge_games, select_team_games
 
 _LOGGER = logging.getLogger(__name__)
+_T = TypeVar("_T")
 
 LIVE_INTERVAL = timedelta(seconds=60)
 SOON_INTERVAL = timedelta(minutes=15)
@@ -34,6 +42,8 @@ STANDINGS_INTERVAL = timedelta(hours=1)
 STANDINGS_RETRY = timedelta(minutes=10)
 # Overall cap (seconds) per standings request, so it never holds up a refresh.
 STANDINGS_TIMEOUT = 8
+# Schedule key for the World Rugby ranking (not a competition slug).
+_WORLD = "<world rankings>"
 _NOT_IN_PLAY = ("result", "postponed", "canceled")
 
 type RugbyPassConfigEntry = ConfigEntry[RugbyPassCoordinator]
@@ -111,46 +121,73 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
         self._competition_failures: dict[str, int] = {}
         # League positions per competition: slug -> team id -> position.
         self.standings: dict[str, dict[int, int]] = {}
-        # When each competition's standings are next due: an hour after a
-        # successful fetch (an empty table included, e.g. no standings page),
-        # 10 minutes after a failed one.
+        # World Rugby men's ranking: team slug -> position.
+        self.world_rankings: dict[str, int] = {}
+        # When each ranking source is next due (league slug, or _WORLD): an
+        # hour after a successful fetch (an empty table included, e.g. no
+        # standings page), 10 minutes after a failed one.
         self._standings_next: dict[str, datetime] = {}
 
-    def rank(self, competition_slug: str, team_id: int) -> int | None:
-        """League position of a team in a competition, if known."""
-        return self.standings.get(competition_slug, {}).get(team_id)
+    def rank(self, competition_slug: str, team: Team) -> int | None:
+        """A team's rank in a game of the given competition, if known.
 
-    async def _fetch_standings(self, slug: str) -> dict[int, int]:
+        World-ranking competitions (World Cup, Nations Championship,
+        Internationals) use the World Rugby ranking, matched by team slug.
+        Others use their league table, matched by team id. A tournament with
+        no league table here that is not one of the integration's
+        competitions can only come from the Internationals page (e.g. the
+        Pacific Nations Cup), so it uses the world ranking too.
+        """
+        if competition_slug in WORLD_RANKING_COMPETITIONS:
+            return self.world_rankings.get(team.slug)
+        if competition_slug in self.standings:
+            return self.standings[competition_slug].get(team.id)
+        if competition_slug and competition_slug not in COMPETITIONS:
+            return self.world_rankings.get(team.slug)
+        return None
+
+    def _due(self, key: str, now: datetime) -> bool:
+        due_at = self._standings_next.get(key)
+        return due_at is None or now >= due_at
+
+    async def _capped(self, fetch: Awaitable[_T]) -> _T:
         async with asyncio.timeout(STANDINGS_TIMEOUT):
-            return await self.client.fetch_standings(slug)
+            return await fetch
 
     async def _refresh_standings(self, slugs: list[str], now: datetime) -> None:
-        """Fetch due league tables concurrently; failures are never fatal.
+        """Fetch due league tables and world rankings concurrently.
 
-        A failed fetch keeps the last good table and is retried after
-        ``STANDINGS_RETRY``; it never touches the game failure counters.
+        Never fatal: a failed fetch (any exception, a timeout included) keeps
+        the last good table and is retried after ``STANDINGS_RETRY``; it
+        never touches the game failure counters.
         """
-        due = [
-            s
-            for s in slugs
-            if s not in self._standings_next or now >= self._standings_next[s]
-        ]
-        if not due:
+        jobs: dict[str, Awaitable[Any]] = {}
+        for slug in slugs:
+            if slug not in WORLD_RANKING_COMPETITIONS and self._due(slug, now):
+                jobs[slug] = self.client.fetch_standings(slug)
+        if any(s in WORLD_RANKING_COMPETITIONS for s in slugs) and self._due(
+            _WORLD, now
+        ):
+            jobs[_WORLD] = self.client.fetch_world_rankings()
+        if not jobs:
             return
         results = await asyncio.gather(
-            *(self._fetch_standings(s) for s in due), return_exceptions=True
+            *(self._capped(job) for job in jobs.values()), return_exceptions=True
         )
-        for slug, result in zip(due, results, strict=True):
+        for key, result in zip(jobs, results, strict=True):
             if isinstance(result, BaseException):
                 if not isinstance(result, Exception):
                     raise result  # cancellation and the like must propagate
                 _LOGGER.debug(
-                    "Standings for %s unavailable, keeping the last: %r", slug, result
+                    "Rankings for %s unavailable, keeping the last: %r", key, result
                 )
-                self._standings_next[slug] = now + STANDINGS_RETRY
+                self._standings_next[key] = now + STANDINGS_RETRY
                 continue
-            self.standings[slug] = result
-            self._standings_next[slug] = now + STANDINGS_INTERVAL
+            if key == _WORLD:
+                self.world_rankings = result
+            else:
+                self.standings[key] = result
+            self._standings_next[key] = now + STANDINGS_INTERVAL
 
     def _followed(self, games: list[Game]) -> list[Game]:
         teams = entry_teams(self.config_entry)
