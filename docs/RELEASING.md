@@ -9,7 +9,7 @@ The `rugby_team_tracker.zip` asset is a convenience download only. HACS installs
 ## Steps
 
 1. Make sure `main` is green (CI: tests, card, hacs, hassfest).
-2. Check `custom_components/rugby_team_tracker/manifest.json` `version` matches the tag you are about to create (currently `0.5.0`); bump it first if not.
+2. Check `custom_components/rugby_team_tracker/manifest.json` `version` matches the tag you are about to create (currently `0.5.0`); bump it first if not, and bump the version in `USER_AGENT` in `custom_components/rugby_team_tracker/const.py` together with it (a test fails if they differ).
 3. Tag and push: `git tag v0.5.0 && git push origin v0.5.0`.
 4. Confirm the Release workflow succeeded and the release has `rugby_team_tracker.zip`.
 5. In Home Assistant, HACS > Custom repositories > add `https://github.com/craibo/ha-rugby-team-tracker` as type Integration, download it, restart HA, then add **Rugby Team Tracker**.
