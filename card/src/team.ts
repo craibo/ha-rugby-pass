@@ -1,3 +1,4 @@
+import { entitiesChanged, pickStubEntity } from "./editor-helpers";
 import { buildView, type CardView, type HassEntity } from "./state";
 
 export type TeamConfig = {
@@ -42,9 +43,13 @@ export function validateTeamConfig(config: TeamConfig): TeamConfig {
   const previous = Array.isArray(config?.previous)
     ? config.previous.filter((e): e is string => typeof e === "string" && e !== "")
     : [];
-  const current = str(config?.current);
-  const next = str(config?.next);
-  if (!current && !next && previous.length === 0) {
+  const present =
+    !!config &&
+    typeof config === "object" &&
+    (typeof config.current === "string" ||
+      typeof config.next === "string" ||
+      Array.isArray(config.previous));
+  if (!present) {
     throw new Error("rugbypass-team-card: configure at least 'next', 'current' or 'previous'");
   }
   return { ...config, previous: previous.slice(0, MAX_PREVIOUS) };
@@ -66,8 +71,7 @@ function formatDate(raw: unknown, locale: string, timeZone: string): string {
     return new Intl.DateTimeFormat(locale, {
       day: "numeric",
       month: "short",
-      year: "2-digit",
-      timeZone,
+            timeZone,
     }).format(d);
   } catch {
     return s;
@@ -116,4 +120,49 @@ export function buildTeamView(
     .map((id) => previousRow(get(id), locale, timeZone))
     .filter((r): r is PreviousRow => r !== undefined);
   return { top, previous, heading: str(config.title) };
+}
+
+type States = Record<string, unknown> | undefined;
+
+export function shouldUpdateTeamCard(
+  config: TeamConfig | undefined,
+  configChanged: boolean,
+  hassChanged: boolean,
+  prevStates: States,
+  nextStates: States,
+): boolean {
+  if (!config || configChanged) return true;
+  if (hassChanged) return entitiesChanged(prevStates, nextStates, teamEntityIds(config));
+  return true;
+}
+
+export function teamCardSize(rows: number): number {
+  return 2 + Math.min(MAX_PREVIOUS, rows);
+}
+
+export function teamStubConfig(states: States): TeamConfig {
+  const derived = deriveTeamEntities(pickStubEntity(states));
+  return derived
+    ? { type: "custom:rugbypass-team-card", ...derived }
+    : { type: "custom:rugbypass-team-card", next: "" };
+}
+
+/** Config produced by the editor after a pick: derived entities, or only `next`. Never mutates inputs. */
+export function buildEditorConfig(
+  picked: string | undefined,
+  title: string | undefined,
+  type: string | undefined,
+  _old: TeamConfig | undefined,
+): TeamConfig {
+  const config: TeamConfig = { type: type ?? "custom:rugbypass-team-card" };
+  if (title) config.title = title;
+  const derived = picked ? deriveTeamEntities(picked) : undefined;
+  if (derived) {
+    config.current = derived.current;
+    config.next = derived.next;
+    config.previous = [...derived.previous];
+  } else {
+    config.next = picked ?? "";
+  }
+  return config;
 }

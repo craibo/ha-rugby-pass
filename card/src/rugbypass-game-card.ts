@@ -2,6 +2,7 @@ import { LitElement, html, nothing, type PropertyValues } from "lit";
 import "./editor";
 import "./rugbypass-team-card";
 import { entityChanged, pickStubEntity } from "./editor-helpers";
+import { registerCard } from "./register";
 import { gameBlock, gameBlockStyles } from "./game-block";
 import { buildView, type CardView, type HassEntity } from "./state";
 
@@ -72,9 +73,7 @@ if (!customElements.get("rugbypass-game-card")) {
   customElements.define("rugbypass-game-card", RugbyPassGameCard);
 }
 
-const w = window as unknown as { customCards?: Array<Record<string, string>> };
-w.customCards = w.customCards || [];
-w.customCards.push({
+registerCard(window as unknown as Parameters<typeof registerCard>[0], {
   type: "rugbypass-game-card",
   name: "RugbyPass Game Card",
   description: "Shows a RugbyPass game: kick-off, live score or final result.",

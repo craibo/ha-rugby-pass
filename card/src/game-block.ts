@@ -17,6 +17,7 @@ export function gameBlock(v: CardView): TemplateResult {
     <div class="row">
       ${team(v.home)}
       <div class="centre">
+        ${v.dateLine ? html`<div class="dateline">${v.dateLine}</div>` : nothing}
         <div class="headline">${v.headline}</div>
         ${v.badge ? html`<div class="badge">${v.badge}</div>` : nothing}
       </div>
@@ -60,6 +61,15 @@ export const gameBlockStyles = css`
     .headline {
       font-size: 1.4em;
       font-weight: 600;
+    }
+    .game.upcoming .headline {
+      font-size: 1.15em;
+      white-space: nowrap;
+    }
+    .dateline {
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+      white-space: nowrap;
     }
     .badge {
       display: inline-block;

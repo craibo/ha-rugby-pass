@@ -6,6 +6,8 @@ export type CardView = {
   away: TeamView;
   headline: string;
   badge?: string;
+  /** Upcoming only: the kick-off date, shown above the time (headline). */
+  dateLine?: string;
 };
 
 const EMPTY: CardView = {
@@ -22,22 +24,31 @@ const str = (v: unknown): string | undefined =>
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
-function formatKickoff(raw: unknown, locale: string, timeZone: string): string {
+function formatKickoff(
+  raw: unknown,
+  locale: string,
+  timeZone: string,
+): { headline: string; dateLine?: string } {
   const s = str(raw);
-  if (!s) return "TBC";
+  if (!s) return { headline: "TBC" };
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
+  if (Number.isNaN(d.getTime())) return { headline: s };
   try {
-    return new Intl.DateTimeFormat(locale, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone,
-    }).format(d);
+    return {
+      dateLine: new Intl.DateTimeFormat(locale, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone,
+      }).format(d),
+      headline: new Intl.DateTimeFormat(locale, {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone,
+      }).format(d),
+    };
   } catch {
-    return s;
+    return { headline: s };
   }
 }
 
@@ -65,14 +76,14 @@ export function buildView(
 
     switch (period) {
       case "Kick off":
-        return { mode: "upcoming", home, away, headline: formatKickoff(a.kickoff, locale, timeZone) };
+        return { mode: "upcoming", home, away, ...formatKickoff(a.kickoff, locale, timeZone) };
       case "Postponed":
       case "Cancelled":
         return {
           mode: "upcoming",
           home,
           away,
-          headline: formatKickoff(a.kickoff, locale, timeZone),
+          ...formatKickoff(a.kickoff, locale, timeZone),
           badge: period,
         };
       case "First Half":

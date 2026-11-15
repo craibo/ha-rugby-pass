@@ -1,5 +1,5 @@
 import { LitElement, html, type TemplateResult } from "lit";
-import { deriveTeamEntities, type TeamConfig } from "./team";
+import { buildEditorConfig, type TeamConfig } from "./team";
 
 type FormData = { entity?: string; title?: string };
 
@@ -30,22 +30,18 @@ export class RugbyPassTeamCardEditor extends LitElement {
     this._hass = hass;
   }
 
+  private _helper = (field: { name: string }): string | undefined =>
+    field.name === "entity"
+      ? "Other sensors are filled in automatically. Set them individually in YAML if needed."
+      : undefined;
+
   private _label = (field: { name: string }): string => LABELS[field.name] ?? field.name;
 
   private _changed(ev: CustomEvent): void {
     const value = (ev.detail?.value ?? {}) as FormData;
     const picked = typeof value.entity === "string" ? value.entity : "";
     const title = typeof value.title === "string" && value.title !== "" ? value.title : undefined;
-    const derived = picked ? deriveTeamEntities(picked) : undefined;
-    const config: TeamConfig = { type: this._config?.type ?? "custom:rugbypass-team-card" };
-    if (title) config.title = title;
-    if (derived) {
-      config.current = derived.current;
-      config.next = derived.next;
-      config.previous = [...derived.previous];
-    } else {
-      config.next = picked;
-    }
+    const config = buildEditorConfig(picked, title, this._config?.type, this._config);
     this._config = config;
     this.dispatchEvent(
       new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),
@@ -63,6 +59,7 @@ export class RugbyPassTeamCardEditor extends LitElement {
       .data=${data}
       .schema=${SCHEMA}
       .computeLabel=${this._label}
+      .computeHelper=${this._helper}
       @value-changed=${this._changed}
     ></ha-form>`;
   }

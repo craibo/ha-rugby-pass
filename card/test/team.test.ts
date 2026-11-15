@@ -4,7 +4,12 @@ import {
   deriveTeamEntities,
   validateTeamConfig,
   teamEntityIds,
+  shouldUpdateTeamCard,
+  teamCardSize,
+  buildEditorConfig,
+  teamStubConfig,
 } from "../src/team";
+import { registerCard } from "../src/register";
 import { entitiesChanged } from "../src/editor-helpers";
 import type { HassEntity } from "../src/state";
 
@@ -108,8 +113,8 @@ describe("buildTeamView previous", () => {
     const k = { kickoff: "2026-11-21T23:30:00+00:00" };
     const utc = buildTeamView({ p1: prev("W 1–0", k) }, cfg, "en-GB", "UTC").previous[0].date;
     const syd = buildTeamView({ p1: prev("W 1–0", k) }, cfg, "en-GB", "Australia/Sydney").previous[0].date;
-    expect(utc).toContain("21");
-    expect(syd).toContain("22");
+    expect(utc).toBe("21 Nov");
+    expect(syd).toBe("22 Nov");
   });
   it("does not throw on bad data", () => {
     const states = {
@@ -135,11 +140,16 @@ describe("buildTeamView previous", () => {
 });
 
 describe("validateTeamConfig", () => {
-  it("errors when nothing configured", () => {
+  it("errors when none of the keys is present", () => {
     expect(() => validateTeamConfig({} as never)).toThrow(/rugbypass-team-card/);
-    expect(() => validateTeamConfig({ previous: [] } as never)).toThrow();
+    expect(() => validateTeamConfig({ title: "x" } as never)).toThrow();
     expect(() => validateTeamConfig(undefined as never)).toThrow();
-    expect(() => validateTeamConfig({ next: "" } as never)).toThrow();
+  });
+  it("accepts present-but-empty keys as unconfigured", () => {
+    expect(() => validateTeamConfig({ next: "" })).not.toThrow();
+    expect(() => validateTeamConfig({ previous: [] })).not.toThrow();
+    expect(() => validateTeamConfig({ current: "" })).not.toThrow();
+    expect(validateTeamConfig({ next: "" }).previous).toEqual([]);
   });
   it("accepts next, current or previous", () => {
     expect(validateTeamConfig({ next: "a" }).next).toBe("a");
@@ -169,5 +179,93 @@ describe("entitiesChanged", () => {
   });
   it("true with no prev hass", () => {
     expect(entitiesChanged(undefined, { x: a }, ["x"])).toBe(true);
+  });
+});
+
+describe("shouldUpdateTeamCard", () => {
+  const a = { state: "1" };
+  const config = { next: "n", previous: ["p1"] };
+  const states = { n: a, p1: a, other: a };
+  it("true on first render (no config)", () => {
+    expect(shouldUpdateTeamCard(undefined, false, false, undefined, states)).toBe(true);
+  });
+  it("true when config changed", () => {
+    expect(shouldUpdateTeamCard(config, true, false, states, states)).toBe(true);
+  });
+  it("true when a configured entity changed", () => {
+    expect(shouldUpdateTeamCard(config, false, true, states, { ...states, p1: { state: "2" } })).toBe(true);
+  });
+  it("false when only an unrelated entity changed", () => {
+    expect(shouldUpdateTeamCard(config, false, true, states, { ...states, other: { state: "2" } })).toBe(false);
+  });
+  it("true when nothing tracked changed (other props)", () => {
+    expect(shouldUpdateTeamCard(config, false, false, states, states)).toBe(true);
+  });
+});
+
+describe("teamCardSize", () => {
+  it("is 2 + min(5, rows)", () => {
+    expect(teamCardSize(0)).toBe(2);
+    expect(teamCardSize(3)).toBe(5);
+    expect(teamCardSize(9)).toBe(7);
+  });
+});
+
+describe("teamStubConfig", () => {
+  it("derives from first rugbypass sensor", () => {
+    const c = teamStubConfig({ "sensor.t": {}, "sensor.leinster_next_game": {} });
+    expect(c).toMatchObject({
+      type: "custom:rugbypass-team-card",
+      current: "sensor.leinster_current_game",
+      next: "sensor.leinster_next_game",
+    });
+    expect(c.previous).toHaveLength(5);
+  });
+  it("falls back to empty next", () => {
+    expect(teamStubConfig({ "light.a": {} })).toEqual({ type: "custom:rugbypass-team-card", next: "" });
+    expect(teamStubConfig(undefined)).toEqual({ type: "custom:rugbypass-team-card", next: "" });
+  });
+  it("stub validates", () => {
+    expect(() => validateTeamConfig(teamStubConfig(undefined))).not.toThrow();
+  });
+});
+
+describe("buildEditorConfig", () => {
+  it("derives all entities and title", () => {
+    const c = buildEditorConfig("sensor.x_next_game", "X", "custom:rugbypass-team-card", undefined);
+    expect(c).toEqual({
+      type: "custom:rugbypass-team-card",
+      title: "X",
+      ...deriveTeamEntities("sensor.x_next_game"),
+    });
+  });
+  it("omits empty title", () => {
+    expect("title" in buildEditorConfig("sensor.x_next_game", "", "t", undefined)).toBe(false);
+  });
+  it("re-pick replaces a custom previous list and returns fresh copies", () => {
+    const old = { type: "t", next: "n", previous: ["custom1"] };
+    const c = buildEditorConfig("sensor.y_current_game", undefined, "t", old);
+    expect(c.previous).toHaveLength(5);
+    expect(c.previous?.[0]).toBe("sensor.y_previous_game_1");
+    expect(old.previous).toEqual(["custom1"]);
+    const d = deriveTeamEntities("sensor.y_current_game")!;
+    expect(c.previous).not.toBe(d.previous);
+  });
+  it("unmatched id sets only next", () => {
+    expect(buildEditorConfig("sensor.other", undefined, "t", { type: "t", previous: ["a"] })).toEqual({
+      type: "t",
+      next: "sensor.other",
+    });
+  });
+});
+
+describe("registerCard", () => {
+  it("does not double-push", () => {
+    const w: { customCards?: Array<Record<string, string>> } = {};
+    const e = { type: "a", name: "A", description: "d" };
+    registerCard(w, e);
+    registerCard(w, e);
+    registerCard(w, { ...e, type: "b" });
+    expect(w.customCards?.map((c) => c.type)).toEqual(["a", "b"]);
   });
 });

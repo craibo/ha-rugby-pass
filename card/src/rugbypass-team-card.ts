@@ -1,12 +1,13 @@
 import { LitElement, html, css, nothing, type PropertyValues } from "lit";
 import "./team-editor";
-import { entitiesChanged, pickStubEntity } from "./editor-helpers";
+import { registerCard } from "./register";
 import { gameBlock, gameBlockStyles } from "./game-block";
 import type { HassEntity } from "./state";
 import {
   buildTeamView,
-  deriveTeamEntities,
-  teamEntityIds,
+  shouldUpdateTeamCard,
+  teamCardSize,
+  teamStubConfig,
   validateTeamConfig,
   type TeamCardView,
   type TeamConfig,
@@ -32,20 +33,18 @@ export class RugbyPassTeamCard extends LitElement {
   }
 
   static getStubConfig(hass?: Hass): TeamConfig {
-    const derived = deriveTeamEntities(pickStubEntity(hass?.states));
-    return derived
-      ? { type: "custom:rugbypass-team-card", ...derived }
-      : { type: "custom:rugbypass-team-card", next: "" };
+    return teamStubConfig(hass?.states);
   }
 
   protected shouldUpdate(changed: PropertyValues): boolean {
-    if (!this._config) return true;
-    if (changed.has("_config")) return true;
-    if (changed.has("_hass")) {
-      const prev = changed.get("_hass") as Hass | undefined;
-      return entitiesChanged(prev?.states, this._hass?.states, teamEntityIds(this._config));
-    }
-    return true;
+    const prev = changed.get("_hass") as Hass | undefined;
+    return shouldUpdateTeamCard(
+      this._config,
+      changed.has("_config"),
+      changed.has("_hass"),
+      prev?.states,
+      this._hass?.states,
+    );
   }
 
   setConfig(config: TeamConfig): void {
@@ -57,7 +56,7 @@ export class RugbyPassTeamCard extends LitElement {
   }
 
   getCardSize(): number {
-    return 2 + Math.min(5, this._view()?.previous.length ?? 0);
+    return teamCardSize(this._view()?.previous.length ?? 0);
   }
 
   private _view(): TeamCardView | undefined {
@@ -157,12 +156,8 @@ if (!customElements.get("rugbypass-team-card")) {
   customElements.define("rugbypass-team-card", RugbyPassTeamCard);
 }
 
-const w = window as unknown as { customCards?: Array<Record<string, string>> };
-w.customCards = w.customCards || [];
-if (!w.customCards.some((c) => c.type === "rugbypass-team-card")) {
-  w.customCards.push({
-    type: "rugbypass-team-card",
-    name: "RugbyPass Team Card",
-    description: "Current or next game plus the previous five results for one team",
-  });
-}
+registerCard(window as unknown as Parameters<typeof registerCard>[0], {
+  type: "rugbypass-team-card",
+  name: "RugbyPass Team Card",
+  description: "Current or next game plus the previous five results for one team",
+});
