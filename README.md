@@ -46,6 +46,8 @@ Seven sensors per team:
 | Next game | Kick-off date and time (timestamp) |
 | Previous game 1 to 5 | Result from the team's side, for example `W 24–17` (1 is the most recent) |
 
+Current game and Previous game 1 to 5 use a rugby ball icon. Next game keeps Home Assistant's default clock icon (it is a timestamp sensor).
+
 Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute`, `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)).
 
 ### Ranks
@@ -68,9 +70,11 @@ entity: sensor.leinster_next_game
 
 It shows both teams with logos, each name followed by the team's rank (league position or world ranking, see [Ranks](#ranks)) in lighter text when known (for example `Leinster 3rd`), and:
 
-- **Upcoming:** kick-off date and time.
+- **Upcoming:** kick-off date and time, with the venue (when known) in lighter text under the time.
 - **Live:** current score and a period/minute badge.
 - **Final:** the final score.
+
+When the card shows a current (live) or previous game, clicking the game block opens the match page on RugbyPass in a new browser tab. RugbyPass cannot be embedded in Home Assistant (it forbids framing), so a new tab is used. The next game is not clickable.
 
 Current game is empty when nothing is live, so use a Next game or Previous game sensor for a card that always shows something.
 
@@ -109,6 +113,8 @@ previous:
 ```
 
 At least one of `next`, `current` or a non-empty `previous` is required; entries in `previous` beyond five are ignored. Each previous result shows the date, the opposition, its current rank (league position or world ranking) and the venue in brackets (for example `Munster 3rd (Stade de France)`; the rank and venue are in lighter text and left out when unknown), and the score coloured green for a win, red for a loss and amber for a draw. Slots with no game are left out, so a team with fewer than five past games shows fewer rows. With nothing live or scheduled the top block reads "No game". The top block shows ranks after both team names, as in the game card. Ranks use English ordinals (1st, 2nd, 3rd) when Home Assistant's language is English and `#1`, `#2` otherwise.
+
+Clicking a previous-result row opens that match on RugbyPass in a new tab, and clicking the top block does the same when it shows a live game (rows without a match link stay plain text). The next game is not clickable. The venue of an upcoming game shows under its kick-off time.
 
 **Visual editor:** pick any one of the team's game sensors and the editor fills in the other six from the entity-id naming (`..._current_game`, `..._next_game`, `..._previous_game_1` to `5`). If you have renamed the entities so they no longer follow that pattern, set the entity ids explicitly in YAML as above. If the sensor you pick does not follow the naming pattern, the editor sets only `next`; add `current` and `previous` in YAML.
 

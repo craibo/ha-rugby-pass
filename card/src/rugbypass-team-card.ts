@@ -5,6 +5,7 @@ import { gameBlock, gameBlockStyles } from "./game-block";
 import type { HassEntity } from "./state";
 import {
   buildTeamView,
+  previousLinkLabel,
   shouldUpdateTeamCard,
   teamCardSize,
   teamStubConfig,
@@ -80,9 +81,8 @@ export class RugbyPassTeamCard extends LitElement {
       ${v.previous.length === 0
         ? html`<div class="none">No previous games</div>`
         : html`<ul class="previous">
-            ${v.previous.map(
-              (r) => html`<li class="prev-row">
-                <span class="date">${r.date}</span>
+            ${v.previous.map((r) => {
+              const cells = html`<span class="date">${r.date}</span>
                 <span class="opp"
                   >${r.opposition}${r.rankLabel
                     ? html` <span class="rank">${r.rankLabel}</span>`
@@ -90,9 +90,20 @@ export class RugbyPassTeamCard extends LitElement {
                     ? html` <span class="loc">(${r.location})</span>`
                     : nothing}</span
                 >
-                <span class="score ${r.outcome}">${r.score}</span>
-              </li>`,
-            )}
+                <span class="score ${r.outcome}">${r.score}</span>`;
+              return html`<li class="prev-row">
+                ${r.matchUrl
+                  ? html`<a
+                      class="prev-link"
+                      href=${r.matchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label=${previousLinkLabel(r.opposition)}
+                      >${cells}</a
+                    >`
+                  : cells}
+              </li>`;
+            })}
           </ul>`}
     </ha-card>`;
   }
@@ -121,6 +132,15 @@ export class RugbyPassTeamCard extends LitElement {
         align-items: baseline;
         padding: 3px 0;
         font-size: 0.9em;
+      }
+      .prev-row a.prev-link {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        gap: 8px;
+        align-items: baseline;
+        margin: -3px -4px;
+        padding: 3px 4px;
       }
       .date {
         flex: 0 0 auto;
