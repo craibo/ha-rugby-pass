@@ -298,3 +298,55 @@ def test_parse_standings_html_entity_escaped():
     end = html.index("</div>", start)
     escaped = html[:start] + html[start:end].replace('"', "&quot;") + html[end:]
     assert len(parse_standings(escaped)) == 16
+
+
+@pytest.mark.parametrize(
+    "bad_id",
+    ['"²"', '"١٢"', '"' + "9" * 5000 + '"', "9" * 20, '"1234567890"', "1.5", "true"],
+    ids=["superscript", "arabic-indic", "5000-digit-string", "20-digit-int",
+         "10-digit-string", "float", "bool"],
+)  # fmt: skip
+def test_parse_standings_skips_unusable_ids(bad_id):
+    html = _standings_html().replace('"team":{"id":3098,', f'"team":{{"id":{bad_id},', 1)
+    table = parse_standings(html)
+    assert 3098 not in table
+    assert len(table) == 15
+
+
+def test_parse_standings_accepts_digit_string_ids():
+    html = _standings_html().replace('"team":{"id":3098,', '"team":{"id":" 3098 ",', 1)
+    assert parse_standings(html)[3098] == 1
+
+
+def test_parse_standings_deeply_nested_json_raises_parse_error():
+    deep = "[" * 100_000 + "]" * 100_000
+    html = (
+        '<div id="standings-data" style="display: none;">'
+        '{"hasStandings":true,"x":' + deep + "}</div>"
+    )
+    with pytest.raises(ParseError):
+        parse_standings(html)
+
+
+@pytest.mark.parametrize("position", ["0", "-3", '"0"'], ids=["zero", "negative", "zero-str"])
+def test_parse_standings_drops_positions_below_one(position):
+    html = _standings_html().replace('"position":7,', f'"position":{position},', 1)
+    table = parse_standings(html)
+    assert 4471 not in table
+    assert len(table) == 15
+
+
+def test_parse_standings_duplicate_team_keeps_first():
+    # Make Zebre (16th) a second Glasgow entry: the first (1st) wins.
+    html = _standings_html().replace('"team":{"id":4474,', '"team":{"id":3098,', 1)
+    table = parse_standings(html)
+    assert table[3098] == 1
+    assert len(table) == 15
+
+
+def test_parse_standings_huge_raw_int_raises_parse_error():
+    # Python refuses to decode ints over 4300 digits (ValueError): the page
+    # is unusable, which must surface as ParseError, never ValueError.
+    html = _standings_html().replace('"team":{"id":3098,', '"team":{"id":' + "9" * 5000 + ",", 1)
+    with pytest.raises(ParseError):
+        parse_standings(html)

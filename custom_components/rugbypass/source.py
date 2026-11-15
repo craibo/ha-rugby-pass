@@ -104,35 +104,62 @@ def parse_standings(page: str) -> dict[int, int]:
     Only a single league table is used: pool or conference pages (such as
     the World Cup) give positions within a pool, which would read as league
     positions, so they yield an empty table, as does a page without
-    standings. Entries without an integer team id and position are skipped.
+    standings. Entries without a usable team id and position (>= 1) are
+    skipped; for a repeated team the first entry wins.
     """
+    try:
+        return _parse_standings(page)
+    except ParseError:
+        raise
+    except (RecursionError, ValueError, TypeError) as err:
+        # Untrusted JSON: e.g. absurd nesting or an int too long to decode.
+        raise ParseError(f"Unusable standings data: {type(err).__name__}") from err
+
+
+def _parse_standings(page: str) -> dict[int, int]:
     data = _extract_inline_json(page, STANDINGS_MARKER, dict, "standings data")
     if not data.get("hasStandings") or data.get("standingsConference"):
         return {}
     table = data.get("standingsData")
     if not isinstance(table, dict) or table.get("groups"):
         return {}
+    standings = table.get("standings") or []
+    if not isinstance(standings, list):
+        return {}
     positions: dict[int, int] = {}
-    for entry in table.get("standings") or []:
+    for entry in standings:
         if not isinstance(entry, dict):
             continue
         team = entry.get("team")
         team_id = _as_int(team.get("id")) if isinstance(team, dict) else None
         position = _as_int(entry.get("position"))
-        if team_id is None or position is None:
+        if team_id is None or position is None or position < 1:
             continue
-        positions[team_id] = position
+        positions.setdefault(team_id, position)
     return positions
 
 
+_MAX_INT_DIGITS = 9
+_INT_LIMIT = 10**_MAX_INT_DIGITS
+
+
 def _as_int(value: Any) -> int | None:
-    """An int (or all-digit string) as int; anything else is None."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str) and value.strip().isdigit():
-        return int(value.strip())
+    """A small int (or ASCII-digit string) as int; anything else is None.
+
+    Never raises: unusable values (bools, floats, non-ASCII digits such as
+    "²", absurdly long numbers) are None.
+    """
+    try:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if -_INT_LIMIT < value < _INT_LIMIT else None
+        if isinstance(value, str):
+            text = value.strip()
+            if text.isascii() and text.isdigit() and len(text) <= _MAX_INT_DIGITS:
+                return int(text)
+    except (TypeError, ValueError):
+        pass
     return None
 
 
