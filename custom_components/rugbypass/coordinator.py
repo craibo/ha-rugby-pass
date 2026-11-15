@@ -22,7 +22,8 @@ SOON_INTERVAL = timedelta(minutes=15)
 IDLE_INTERVAL = timedelta(hours=6)
 SOON_WINDOW = timedelta(hours=2)
 MAX_CONSECUTIVE_FAILURES = 3
-_EXCLUDED = ("postponed", "canceled")
+RETRY_INTERVAL = timedelta(minutes=5)
+MIN_INTERVAL = timedelta(seconds=60)
 
 type RugbyPassConfigEntry = ConfigEntry[RugbyPassCoordinator]
 
@@ -37,14 +38,19 @@ def compute_interval(games: list[Game], now: datetime) -> timedelta:
     """Choose the poll interval from the followed games."""
     if any(g.live for g in games):
         return LIVE_INTERVAL
-    for g in games:
-        if (
-            g.status == "fixture"
-            and not g.live
-            and now < g.kickoff <= now + SOON_WINDOW
-        ):
-            return SOON_INTERVAL
-    return IDLE_INTERVAL
+    upcoming = [
+        g.kickoff
+        for g in games
+        if g.status == "fixture" and not g.live and g.kickoff > now
+    ]
+    if not upcoming:
+        return IDLE_INTERVAL
+    earliest = min(upcoming)
+    if earliest <= now + SOON_WINDOW:
+        return SOON_INTERVAL
+    # Wake up when the 2 h window opens rather than overshooting it.
+    wait = earliest - SOON_WINDOW - now
+    return max(MIN_INTERVAL, min(IDLE_INTERVAL, wait))
 
 
 class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
@@ -53,7 +59,7 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
     config_entry: ConfigEntry
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, client: RugbyPassClient
+        self, hass: HomeAssistant, entry: RugbyPassConfigEntry, client: RugbyPassClient
     ) -> None:
         super().__init__(
             hass,
@@ -72,6 +78,7 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
             lists = [await self.client.fetch_competition(s) for s in competitions]
         except RugbyPassError as err:
             self._failures += 1
+            self.update_interval = min(self.update_interval or RETRY_INTERVAL, RETRY_INTERVAL)
             if self.data is None or self._failures >= MAX_CONSECUTIVE_FAILURES:
                 raise UpdateFailed(str(err)) from err
             _LOGGER.warning(

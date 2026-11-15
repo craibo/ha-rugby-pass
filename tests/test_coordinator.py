@@ -59,7 +59,7 @@ def test_interval_soon():
 def test_interval_boundaries():
     assert compute_interval([g(1, timedelta(hours=2))], NOW) == timedelta(minutes=15)
     assert compute_interval([g(1, timedelta(hours=2, seconds=1))], NOW) == timedelta(
-        hours=6
+        seconds=60
     )
     assert compute_interval([g(1, timedelta(0))], NOW) == timedelta(hours=6)
 
@@ -71,6 +71,18 @@ def test_interval_ignores_played_and_postponed():
         g(3, timedelta(minutes=30), status="result"),
     ]
     assert compute_interval(games, NOW) == timedelta(hours=6)
+
+
+def test_interval_does_not_overshoot_window():
+    assert compute_interval([g(1, timedelta(hours=2, minutes=1))], NOW) == timedelta(
+        seconds=60
+    )
+    assert compute_interval([g(1, timedelta(hours=5))], NOW) == timedelta(hours=3)
+    assert compute_interval([g(1, timedelta(hours=7))], NOW) == timedelta(hours=5)
+    assert compute_interval([g(1, timedelta(hours=10))], NOW) == timedelta(hours=6)
+    assert compute_interval(
+        [g(1, timedelta(hours=10)), g(2, timedelta(hours=5))], NOW
+    ) == timedelta(hours=3)
 
 
 def test_interval_empty():
@@ -153,23 +165,31 @@ async def test_failure_handling(hass):
         return [g(1, timedelta(days=1))]
 
     coord = make(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", fetch),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
         await coord.async_refresh()
         good = coord.data
         assert coord.last_update_success
+        normal = coord.update_interval
+        assert normal == timedelta(hours=6)
 
         state["fail"] = True
         await coord.async_refresh()
         assert coord.last_update_success and coord.data is good
+        assert coord.update_interval <= timedelta(minutes=5)
         await coord.async_refresh()
         assert coord.last_update_success and coord.data is good
         await coord.async_refresh()
         assert not coord.last_update_success
         assert coord.data is good
+        assert coord.update_interval <= timedelta(minutes=5)
 
         state["fail"] = False
         await coord.async_refresh()
         assert coord.last_update_success
+        assert coord.update_interval == normal
 
         # counter reset: two more failures are tolerated again
         state["fail"] = True
