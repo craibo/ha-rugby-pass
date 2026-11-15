@@ -124,8 +124,8 @@ async def test_fetch_standings_returns_positions(mocked):
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"status": 404, "body": "<html>Not found</html>"},
         {"status": 500},
+        {"status": 403},
         {"exception": asyncio.TimeoutError()},
         {"exception": aiohttp.ClientConnectionError("boom")},
         {"status": 200, "body": "<html>nothing here</html>"},
@@ -138,3 +138,22 @@ async def test_fetch_standings_errors_raise(mocked, kwargs):
             await RugbyPassClient(session).fetch_standings("united-rugby-championship")
     if "exception" in kwargs or kwargs.get("status") == 200:
         assert info.value.__cause__ is not None
+
+
+async def test_fetch_standings_404_means_no_standings_page(mocked):
+    # e.g. Internationals: no standings page at all, which is not an error.
+    mocked.get(STANDINGS_URL, status=404, body="<html>Not found</html>")
+    async with aiohttp.ClientSession() as session:
+        table = await RugbyPassClient(session).fetch_standings(
+            "united-rugby-championship"
+        )
+    assert table == {}
+
+
+async def test_fetch_competition_404_still_raises(mocked):
+    mocked.get(URL, status=404)
+    async with aiohttp.ClientSession() as session:
+        with pytest.raises(RugbyPassError):
+            await RugbyPassClient(session).fetch_competition(
+                "united-rugby-championship"
+            )

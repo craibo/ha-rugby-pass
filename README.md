@@ -8,7 +8,7 @@ Polling is deliberately light: every 60 seconds only while a followed game is li
 
 One page is fetched per selected competition, however many teams you follow, and each competition is handled separately: if one page fails, that competition keeps its last known games while the others still update. When every page fails, the integration retries every 5 minutes; entities go unavailable only after 3 consecutive failures, and after that the retry delay doubles (10, 20, then 40 minutes), never waiting longer than the normal polling interval. The normal interval returns as soon as a fetch succeeds.
 
-League positions add one standings request per selected competition per hour (the first on start-up), whatever the polling interval. A failed or missing standings page never affects the entities or the polling: the last known positions are kept, and the page is not asked for again until the hour is up.
+League positions add one standings request per selected competition per hour (the first on start-up), whatever the polling interval; a competition without a standings page (Internationals) is also checked only once an hour. Standings requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed standings request never affects the entities or the polling: the last known positions are kept and the request is retried after 10 minutes.
 
 Requires Home Assistant 2024.11 or newer.
 
