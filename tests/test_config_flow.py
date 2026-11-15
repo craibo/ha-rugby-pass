@@ -179,3 +179,38 @@ async def test_options_flow_cannot_connect(hass):
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
     assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_options_flow_submit_does_not_refetch(hass):
+    entry = make_entry(hass)
+    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["errors"] == {}
+    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"teams": ["1", "2"]}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"teams": [1, 2], "team_names": {"1": "One", "2": "Two"}}
+
+
+async def test_options_flow_down_can_still_unfollow(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=DOMAIN,
+        data={
+            "competitions": [URC],
+            "teams": [1, 2],
+            "team_names": {"1": "One", "2": "Two"},
+        },
+    )
+    entry.add_to_hass(hass)
+    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert result["errors"] == {"base": "cannot_connect"}
+        assert team_options(result) == {"1": "One", "2": "Two"}
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"teams": ["2"]}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"teams": [2], "team_names": {"2": "Two"}}

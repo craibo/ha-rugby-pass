@@ -131,40 +131,51 @@ class RugbyPassConfigFlow(ConfigFlow, domain=DOMAIN):
 class RugbyPassOptionsFlow(OptionsFlow):
     """Edit the followed teams."""
 
+    def __init__(self) -> None:
+        # Names of the teams offered when the form was shown.
+        self._team_names: dict[str, str] = {}
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         entry = self.config_entry
-        errors: dict[str, str] = {}
-        options: list[SelectOptionDict] = []
-        names: dict[str, str] = {}
-        try:
-            options, names = await _fetch_team_options(
-                self.hass, list(entry.data["competitions"])
-            )
-        except RugbyPassError:
-            errors["base"] = "cannot_connect"
+        stored = {
+            **entry.data.get("team_names", {}),
+            **entry.options.get("team_names", {}),
+        }
 
-        if user_input is not None and not errors:
+        if user_input is not None:
+            # No refetch: submitting must work even while RugbyPass is down.
             ids = [int(t) for t in user_input["teams"]]
-            known = {**entry.data.get("team_names", {}), **entry.options.get("team_names", {})}
-            known.update({k: v for k, v in names.items()})
+            known = {**stored, **self._team_names}
             return self.async_create_entry(
                 data={
                     "teams": ids,
-                    "team_names": {str(i): known[str(i)] for i in ids if str(i) in known},
+                    "team_names": {
+                        str(i): known[str(i)] for i in ids if str(i) in known
+                    },
                 }
             )
+
+        errors: dict[str, str] = {}
+        options: list[SelectOptionDict] = []
+        try:
+            options, self._team_names = await _fetch_team_options(
+                self.hass, list(entry.data["competitions"])
+            )
+        except RugbyPassError:
+            # Still offer the followed teams (stored names) so they can be
+            # unfollowed while RugbyPass is unreachable.
+            errors["base"] = "cannot_connect"
 
         current = [
             str(t) for t in entry.options.get("teams", entry.data["teams"])
         ]
         # Keep currently followed teams selectable even if absent from the fetch.
         have = {o["value"] for o in options}
-        old_names = {**entry.data.get("team_names", {}), **entry.options.get("team_names", {})}
         for t in current:
             if t not in have:
-                options.append(SelectOptionDict(value=t, label=old_names.get(t, t)))
+                options.append(SelectOptionDict(value=t, label=stored.get(t, t)))
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
