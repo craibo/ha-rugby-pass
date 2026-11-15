@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import types
 from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -16,25 +14,6 @@ from custom_components.rugbypass.const import DOMAIN
 from custom_components.rugbypass.coordinator import RugbyPassCoordinator
 
 from .test_coordinator import NOW, g
-
-
-@pytest.fixture(autouse=True)
-def stub_config_flow():
-    """The real config flow arrives in a later task; register a minimal one."""
-    previous = config_entries.HANDLERS.get(DOMAIN)
-
-    class _StubFlow(config_entries.ConfigFlow, domain=DOMAIN):
-        VERSION = 1
-
-    with patch(
-        "homeassistant.loader.Integration.async_get_platform",
-        return_value=types.ModuleType("config_flow"),
-    ):
-        yield
-    if previous is None:
-        config_entries.HANDLERS.pop(DOMAIN, None)
-    else:
-        config_entries.HANDLERS[DOMAIN] = previous
 
 
 @pytest.fixture(autouse=True)

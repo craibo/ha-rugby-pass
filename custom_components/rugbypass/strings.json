@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RugbyPass",
+        "description": "Choose the competitions to follow.",
+        "data": {
+          "competitions": "Competitions"
+        }
+      },
+      "teams": {
+        "title": "Teams",
+        "description": "Choose the teams to follow.",
+        "data": {
+          "teams": "Teams"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to RugbyPass.",
+      "no_teams": "No teams were found for the selected competitions."
+    },
+    "abort": {
+      "already_configured": "RugbyPass is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Teams",
+        "description": "Choose the teams to follow.",
+        "data": {
+          "teams": "Teams"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to RugbyPass.",
+      "no_teams": "No teams were found for the selected competitions."
+    }
+  }
+}
