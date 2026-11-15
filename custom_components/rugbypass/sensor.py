@@ -142,6 +142,7 @@ class TeamGameSensor(CoordinatorEntity[RugbyPassCoordinator], SensorEntity):
             identifiers={(DOMAIN, str(team_id))},
             name=team_name,
             manufacturer="RugbyPass",
+            configuration_url=BASE_URL,
             entry_type=DeviceEntryType.SERVICE,
         )
 
