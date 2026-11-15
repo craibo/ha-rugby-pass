@@ -29,6 +29,9 @@ describe("buildView", () => {
     expect(utc.headline).toContain("09:00");
     expect(syd.headline).toContain("20:00");
     expect(syd.headline).not.toBe(utc.headline);
+    expect(utc.dateLine).toContain("21");
+    expect(utc.dateLine).not.toContain("09:00");
+    expect(syd.dateLine).toContain("21");
     expect(utc.badge).toBeUndefined();
   });
 
@@ -89,6 +92,8 @@ describe("buildView", () => {
 
   it("invalid kickoff does not throw", () => {
     expect(buildView(ent({ kickoff: "garbage" }), "en", "UTC").headline).toBe("garbage");
+    expect(buildView(ent({ kickoff: "garbage" }), "en", "UTC").dateLine).toBeUndefined();
+    expect(buildView(ent({ kickoff: "2026-11-21T09:00:00Z" }), "en", "Bad/Zone").headline).toBe("2026-11-21T09:00:00Z");
     expect(buildView(ent({ kickoff: 12 }), "en", "UTC").headline).toBe("TBC");
   });
 

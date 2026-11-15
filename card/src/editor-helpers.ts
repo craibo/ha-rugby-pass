@@ -13,3 +13,9 @@ export function entityChanged(prev: States, next: States, entityId: string): boo
   if (!prev || !next) return true;
   return prev[entityId] !== next[entityId];
 }
+
+/** True when any of the watched entities' state objects differ between two hass states. */
+export function entitiesChanged(prev: States, next: States, entityIds: string[]): boolean {
+  if (!prev || !next) return true;
+  return entityIds.some((id) => prev[id] !== next[id]);
+}

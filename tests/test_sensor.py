@@ -140,6 +140,13 @@ async def test_two_teams_two_devices(hass):
     assert devs.async_get_device(identifiers={(DOMAIN, "2")}).name == "Two"
 
 
+async def test_device_links_to_rugbypass_website(hass):
+    await setup(hass, [g(1, timedelta(days=1))])
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "1")})
+    assert device.manufacturer == "RugbyPass"
+    assert device.configuration_url == "https://www.rugbypass.com"
+
+
 async def test_options_teams_and_names_override(hass):
     entry = await setup(hass, [g(1, timedelta(days=1))])
     with patch.object(RugbyPassClient, "fetch_competition", _fetch_one):
