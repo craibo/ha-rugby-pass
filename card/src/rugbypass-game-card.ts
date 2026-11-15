@@ -1,4 +1,6 @@
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from "lit";
+import "./editor";
+import { entityChanged, pickStubEntity } from "./editor-helpers";
 import { buildView, type CardView, type HassEntity, type TeamView } from "./state";
 
 type Config = { type?: string; entity: string };
@@ -16,6 +18,24 @@ export class RugbyPassGameCard extends LitElement {
 
   declare _config?: Config;
   declare _hass?: Hass;
+
+  static getConfigElement(): HTMLElement {
+    return document.createElement("rugbypass-game-card-editor");
+  }
+
+  static getStubConfig(hass?: Hass): Config {
+    return { type: "custom:rugbypass-game-card", entity: pickStubEntity(hass?.states) };
+  }
+
+  protected shouldUpdate(changed: PropertyValues): boolean {
+    if (!this._config) return true;
+    if (changed.has("_config")) return true;
+    if (changed.has("_hass")) {
+      const prev = changed.get("_hass") as Hass | undefined;
+      return entityChanged(prev?.states, this._hass?.states, this._config.entity);
+    }
+    return true;
+  }
 
   setConfig(config: Config): void {
     if (!config || typeof config.entity !== "string" || !config.entity) {
