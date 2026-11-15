@@ -25,6 +25,10 @@ T2 = Team(2, "Two", "two", "")
 T3 = Team(3, "Three", "three", "")
 
 
+def tm(team_id, slug=None):
+    return Team(team_id, f"Team {team_id}", slug or f"team-{team_id}", "")
+
+
 def g(gid, delta, status="fixture", live=False, home=T1, away=T2):
     return Game(
         id=gid,
@@ -421,12 +425,12 @@ async def test_standings_fetched_on_first_refresh_and_rank(hass):
         await coord.async_refresh()
     assert sorted(calls) == ["a", "b"]
     assert coord.standings == tables
-    assert coord.rank("a", 1) == 3
-    assert coord.rank("a", 2) == 7
-    assert coord.rank("b", 3) == 1
-    assert coord.rank("a", 99) is None  # team not in the table
-    assert coord.rank("zzz", 1) is None  # competition without standings
-    assert coord.rank("", 1) is None
+    assert coord.rank("a", tm(1)) == 3
+    assert coord.rank("a", tm(2)) == 7
+    assert coord.rank("b", tm(3)) == 1
+    assert coord.rank("a", tm(99)) is None  # team not in the table
+    assert coord.rank("zzz", tm(1)) is None  # competition without standings
+    assert coord.rank("", tm(1)) is None
 
 
 async def test_standings_cached_for_an_hour(hass):
@@ -445,24 +449,24 @@ async def test_standings_cached_for_an_hour(hass):
         tables["a"] = {1: 5}
         await coord.async_refresh()
         assert calls == ["a"]
-        assert coord.rank("a", 1) == 3
+        assert coord.rank("a", tm(1)) == 3
         clock.now = NOW + timedelta(hours=1)
         await coord.async_refresh()
         assert calls == ["a", "a"]
-        assert coord.rank("a", 1) == 5
+        assert coord.rank("a", tm(1)) == 5
 
 
 async def test_no_standings_page_not_rerequested_within_the_hour(hass):
-    # The client maps HTTP 404 (Internationals) to an empty table.
+    # The client maps HTTP 404 (no standings page) to an empty table.
     calls: list[str] = []
     clock = _Clock(NOW)
-    coord = make(hass, comps=("internationals",))
+    coord = make(hass, comps=("a",))
     with (
         patch.object(RugbyPassClient, "fetch_competition", _games),
         patch.object(
             RugbyPassClient,
             "fetch_standings",
-            _standings_fetch({"internationals": {}}, calls),
+            _standings_fetch({"a": {}}, calls),
         ),
         patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
     ):
@@ -470,11 +474,11 @@ async def test_no_standings_page_not_rerequested_within_the_hour(hass):
             clock.now = NOW + timedelta(minutes=minutes)
             await coord.async_refresh()
             assert coord.last_update_success
-        assert calls == ["internationals"]
-        assert coord.rank("internationals", 1) is None
+        assert calls == ["a"]
+        assert coord.rank("a", tm(1)) is None
         clock.now = NOW + timedelta(hours=1)
         await coord.async_refresh()
-        assert calls == ["internationals", "internationals"]
+        assert calls == ["a", "a"]
 
 
 async def test_failed_standings_retried_after_ten_minutes(hass):
@@ -492,7 +496,7 @@ async def test_failed_standings_retried_after_ten_minutes(hass):
     ):
         await coord.async_refresh()
         assert calls == ["a"]
-        assert coord.rank("a", 1) is None
+        assert coord.rank("a", tm(1)) is None
         clock.now = NOW + timedelta(minutes=9, seconds=59)
         await coord.async_refresh()
         assert calls == ["a"]  # not before 10 minutes
@@ -500,7 +504,7 @@ async def test_failed_standings_retried_after_ten_minutes(hass):
         clock.now = NOW + timedelta(minutes=10)
         await coord.async_refresh()
         assert calls == ["a", "a"]
-        assert coord.rank("a", 1) == 4
+        assert coord.rank("a", tm(1)) == 4
         # success: cached for the hour from now on
         clock.now = NOW + timedelta(minutes=69)
         await coord.async_refresh()
@@ -528,15 +532,15 @@ async def test_failed_standings_keep_last_good_table_until_retry_succeeds(hass):
         tables["a"] = {1: 6}
         clock.now = NOW + timedelta(hours=1)
         await coord.async_refresh()
-        assert coord.rank("a", 1) == 2
+        assert coord.rank("a", tm(1)) == 2
         clock.now = NOW + timedelta(hours=1, minutes=10)
         await coord.async_refresh()
-        assert coord.rank("a", 1) == 2
+        assert coord.rank("a", tm(1)) == 2
         assert len(calls) == 3
         failing.clear()
         clock.now = NOW + timedelta(hours=1, minutes=20)
         await coord.async_refresh()
-        assert coord.rank("a", 1) == 6
+        assert coord.rank("a", tm(1)) == 6
         assert len(calls) == 4
 
 
@@ -559,7 +563,7 @@ async def test_unexpected_standings_exception_is_not_fatal(hass):
     assert coord.update_interval == interval
     assert coord._failures == 0
     assert coord._competition_failures == {"a": 0}
-    assert coord.rank("a", 1) is None
+    assert coord.rank("a", tm(1)) is None
 
 
 async def test_hanging_standings_fetch_times_out_without_failing(hass):
@@ -589,7 +593,7 @@ async def test_hanging_standings_fetch_times_out_without_failing(hass):
         assert sorted(calls) == ["a", "b"]
         # concurrent: both time out together, not one after the other
         assert elapsed < 0.09
-        assert coord.rank("a", 1) is None
+        assert coord.rank("a", tm(1)) is None
         # a timeout is a failed fetch: retried after 10 minutes
         clock.now = NOW + timedelta(minutes=10)
         await coord.async_refresh()
@@ -642,7 +646,7 @@ async def test_standings_failure_is_never_fatal_and_keeps_last_table(hass):
             assert coord.update_interval == interval
             assert coord._failures == 0
             assert coord._competition_failures == {"a": 0}
-            assert coord.rank("a", 1) == 2  # last good table kept
+            assert coord.rank("a", tm(1)) == 2  # last good table kept
         assert len(calls) == 6
 
 
@@ -657,7 +661,7 @@ async def test_standings_failure_on_first_refresh_is_not_fatal(hass):
     ):
         data = await coord._async_update_data()
     assert data[1].next.id == 1
-    assert coord.rank("a", 1) is None
+    assert coord.rank("a", tm(1)) is None
 
 
 async def test_standings_not_fetched_for_failing_competition(hass):
@@ -686,4 +690,221 @@ async def test_standings_not_fetched_for_failing_competition(hass):
         ):
             await coord.async_refresh()
     assert calls == ["a", "b"]
-    assert coord.rank("b", 3) == 1
+    assert coord.rank("b", tm(3)) == 1
+
+
+# --- world rankings ----------------------------------------------------------------
+
+WORLD = {"south-africa": 1, "new-zealand": 2, "ireland": 3}
+RSA = Team(10, "South Africa", "south-africa", "")
+NZL = Team(11, "New Zealand", "new-zealand", "")
+GIB = Team(12, "Gibraltar", "gibraltar", "")
+
+
+def _world_fetch(calls, table=None, fail=None):
+    async def fetch(self):
+        calls.append("world")
+        if fail is not None and fail["on"]:
+            raise RugbyPassError("rankings down")
+        return dict(table if table is not None else WORLD)
+
+    return fetch
+
+
+def _record_standings(calls, tables=None):
+    async def fetch(self, slug):
+        calls.append(slug)
+        return dict((tables or {}).get(slug, {}))
+
+    return fetch
+
+
+async def test_world_rankings_fetched_hourly_for_world_competitions(hass):
+    world_calls: list[str] = []
+    standings_calls: list[str] = []
+    clock = _Clock(NOW)
+    coord = make(
+        hass,
+        comps=("rugby-world-cup", "nations-championship", "internationals", "top-14"),
+    )
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch(world_calls)),
+        patch.object(
+            RugbyPassClient, "fetch_standings", _record_standings(standings_calls)
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        assert world_calls == ["world"]  # once, however many world competitions
+        assert standings_calls == ["top-14"]  # no league standings for the three
+        assert coord.world_rankings == WORLD
+        clock.now = NOW + timedelta(minutes=59)
+        await coord.async_refresh()
+        assert world_calls == ["world"]
+        clock.now = NOW + timedelta(hours=1)
+        await coord.async_refresh()
+        assert world_calls == ["world", "world"]
+        assert standings_calls == ["top-14", "top-14"]
+        assert coord.last_update_success
+
+
+async def test_world_rankings_not_fetched_for_league_competitions_only(hass):
+    world_calls: list[str] = []
+    standings_calls: list[str] = []
+    coord = make(hass, comps=("united-rugby-championship", "six-nations"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch(world_calls)),
+        patch.object(
+            RugbyPassClient, "fetch_standings", _record_standings(standings_calls)
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    assert world_calls == []
+    assert sorted(standings_calls) == ["six-nations", "united-rugby-championship"]
+    assert coord.world_rankings == {}
+
+
+async def test_world_rankings_failure_retried_after_ten_minutes(hass):
+    calls: list[str] = []
+    fail = {"on": False}
+    table = dict(WORLD)
+    clock = _Clock(NOW)
+    coord = make(hass, comps=("internationals",))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient, "fetch_world_rankings", _world_fetch(calls, table, fail)
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        interval = coord.update_interval
+        assert coord.rank("internationals", RSA) == 1
+        fail["on"] = True
+        table["south-africa"] = 5
+        clock.now = NOW + timedelta(hours=1)
+        await coord.async_refresh()
+        assert len(calls) == 2
+        assert coord.rank("internationals", RSA) == 1  # last good table kept
+        assert coord.last_update_success
+        assert coord.update_interval == interval
+        assert coord._failures == 0
+        assert coord._competition_failures == {"internationals": 0}
+        clock.now = NOW + timedelta(hours=1, minutes=9)
+        await coord.async_refresh()
+        assert len(calls) == 2  # not before 10 minutes
+        fail["on"] = False
+        clock.now = NOW + timedelta(hours=1, minutes=10)
+        await coord.async_refresh()
+        assert len(calls) == 3
+        assert coord.rank("internationals", RSA) == 5
+
+
+async def test_world_rankings_unexpected_exception_not_fatal(hass):
+    async def boom(self):
+        raise ValueError("unexpected")
+
+    coord = make(hass, comps=("nations-championship",))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", boom),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    assert coord.last_update_success
+    assert coord.data[1].next.id == 1
+    assert coord._failures == 0
+    assert coord.rank("nations-championship", RSA) is None
+
+
+async def test_hanging_world_rankings_capped_with_standings_concurrently(hass):
+    never = asyncio.Event()
+    calls: list[str] = []
+
+    async def hang_world(self):
+        calls.append("world")
+        await never.wait()
+        return WORLD
+
+    async def hang_standings(self, slug):
+        calls.append(slug)
+        await never.wait()
+        return {}
+
+    clock = _Clock(NOW)
+    coord = make(hass, comps=("internationals", "top-14"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", hang_world),
+        patch.object(RugbyPassClient, "fetch_standings", hang_standings),
+        patch("custom_components.rugbypass.coordinator.STANDINGS_TIMEOUT", 0.05),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        await coord.async_refresh()
+        elapsed = loop.time() - start
+        assert coord.last_update_success
+        assert coord.data[1].next.id == 1
+        assert coord._failures == 0
+        assert sorted(calls) == ["top-14", "world"]
+        assert elapsed < 0.09  # concurrent, each capped
+        assert coord.rank("internationals", RSA) is None
+        clock.now = NOW + timedelta(minutes=10)
+        await coord.async_refresh()
+        assert len(calls) == 4  # timeouts are retried after 10 minutes
+
+
+async def test_world_rankings_fetched_after_games(hass):
+    order: list[str] = []
+
+    async def games(self, slug):
+        order.append(f"games:{slug}")
+        return [g(1, timedelta(days=1))]
+
+    async def world(self):
+        order.append("world")
+        return {}
+
+    coord = make(hass, comps=("internationals", "rugby-world-cup"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", world),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    assert order == ["games:internationals", "games:rugby-world-cup", "world"]
+
+
+async def test_rank_source_per_competition(hass):
+    coord = make(hass, comps=("internationals", "united-rugby-championship"))
+    leinster = Team(5356, "Leinster", "leinster", "")
+    ireland = Team(20, "Ireland", "ireland", "")
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_world_rankings", _world_fetch([])),
+        patch.object(
+            RugbyPassClient,
+            "fetch_standings",
+            _record_standings([], {"united-rugby-championship": {5356: 6, 20: 99}}),
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    # World competitions: by slug from the world ranking, never by id.
+    for slug in ("rugby-world-cup", "nations-championship", "internationals"):
+        assert coord.rank(slug, ireland) == 3
+        assert coord.rank(slug, GIB) is None  # unranked
+        assert coord.rank(slug, leinster) is None
+    # League competitions: league table by id.
+    assert coord.rank("united-rugby-championship", leinster) == 6
+    assert coord.rank("united-rugby-championship", ireland) == 99
+    assert coord.rank("six-nations", ireland) is None  # not followed: no table
+    # Other tournaments on the Internationals page (no league table of their
+    # own in the integration) use the world ranking.
+    assert coord.rank("pacific-nations-cup", NZL) == 2
+    assert coord.rank("world-rugby-nations-cup", RSA) == 1
+    assert coord.rank("", RSA) is None

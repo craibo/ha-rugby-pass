@@ -33,3 +33,13 @@ def no_standings():
         AsyncMock(return_value={}),
     ) as fetch:
         yield fetch
+
+
+@pytest.fixture(autouse=True)
+def no_world_rankings():
+    """Stub world-ranking fetches (empty table) unless a test patches them."""
+    with patch(
+        "custom_components.rugbypass.client.RugbyPassClient.fetch_world_rankings",
+        AsyncMock(return_value={}),
+    ) as fetch:
+        yield fetch

@@ -9,6 +9,7 @@ import pytest
 
 from custom_components.rugbypass.client import (
     COMPETITIONS,
+    WORLD_RANKING_COMPETITIONS,
     RugbyPassClient,
     RugbyPassError,
 )
@@ -23,6 +24,12 @@ URL = "https://www.rugbypass.com/united-rugby-championship/fixtures-results/"
 
 @pytest.fixture(autouse=True)
 def no_standings():
+    """Override the conftest stub: these tests exercise the real fetch."""
+    yield
+
+
+@pytest.fixture(autouse=True)
+def no_world_rankings():
     """Override the conftest stub: these tests exercise the real fetch."""
     yield
 
@@ -175,3 +182,46 @@ async def test_pool_standings_page_gives_no_ranks(mocked):
     async with aiohttp.ClientSession() as session:
         table = await RugbyPassClient(session).fetch_standings("nations-championship")
     assert table == {}
+
+
+# --- world rankings -------------------------------------------------------------
+
+RANKINGS_URL = "https://www.rugbypass.com/mens-world-rankings/"
+RANKINGS = Path(__file__).parent / "fixtures" / "world_rankings.html"
+
+
+def test_world_ranking_competitions():
+    assert WORLD_RANKING_COMPETITIONS == frozenset(
+        {"rugby-world-cup", "nations-championship", "internationals"}
+    )
+    assert WORLD_RANKING_COMPETITIONS <= set(COMPETITIONS)
+
+
+async def test_fetch_world_rankings(mocked):
+    mocked.get(RANKINGS_URL, status=200, body=RANKINGS.read_text(encoding="utf-8"))
+    async with aiohttp.ClientSession() as session:
+        table = await RugbyPassClient(session).fetch_world_rankings()
+    assert len(table) == 25
+    assert table["south-africa"] == 1
+    (call,) = next(iter(mocked.requests.values()))
+    assert call.kwargs["headers"]["User-Agent"] == USER_AGENT
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"status": 404, "body": "<html>Not found</html>"},
+        {"status": 500},
+        {"exception": asyncio.TimeoutError()},
+        {"exception": aiohttp.ClientConnectionError("boom")},
+        {"status": 200, "body": "<html>nothing here</html>"},
+    ],
+    ids=["404", "500", "timeout", "client-error", "no-data"],
+)
+async def test_fetch_world_rankings_errors_raise(mocked, kwargs):
+    mocked.get(RANKINGS_URL, **kwargs)
+    async with aiohttp.ClientSession() as session:
+        with pytest.raises(RugbyPassError) as info:
+            await RugbyPassClient(session).fetch_world_rankings()
+    if "exception" in kwargs or kwargs.get("status") == 200:
+        assert info.value.__cause__ is not None

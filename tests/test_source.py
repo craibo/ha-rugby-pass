@@ -12,6 +12,7 @@ from custom_components.rugbypass.source import (
     ParseError,
     parse_games,
     parse_standings,
+    parse_world_rankings,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -19,6 +20,8 @@ FIXTURE = FIXTURES / "urc_fixtures.html"
 STANDINGS = FIXTURES / "urc_standings.html"
 POOL_STANDINGS = FIXTURES / "pool_standings.html"
 NO_STANDINGS = FIXTURES / "no_standings.html"
+WORLD_RANKINGS = FIXTURES / "world_rankings.html"
+NO_WORLD_RANKINGS = FIXTURES / "no_world_rankings.html"
 
 CARDIFF_ID = 4471
 SECOND_HALF = PERIODS[2]
@@ -350,3 +353,130 @@ def test_parse_standings_huge_raw_int_raises_parse_error():
     html = _standings_html().replace('"team":{"id":3098,', '"team":{"id":' + "9" * 5000 + ",", 1)
     with pytest.raises(ParseError):
         parse_standings(html)
+
+
+# --- world rankings ---------------------------------------------------------------
+
+
+def _rankings_html() -> str:
+    return WORLD_RANKINGS.read_text(encoding="utf-8")
+
+
+def _entry(p, u, n="X"):
+    return {"p": p, "n": n, "m": 0, "d": 0, "u": u, "l": "", "pts": 50.0}
+
+
+def _rankings_page(entries, before="", after=""):
+    import json as _json
+
+    return (
+        "<script> createApp({ data() { return { type:\"bars\", "
+        + before
+        + "rankings:"
+        + _json.dumps(entries)
+        + ", "
+        + after
+        + "} } }); </script>"
+    )
+
+
+def test_parse_world_rankings_fixture():
+    table = parse_world_rankings(_rankings_html())
+    assert len(table) == 25
+    assert table["south-africa"] == 1
+    assert table["new-zealand"] == 2
+    assert table["ireland"] == 3
+    assert table["france"] == 4
+    assert table["england"] == 5
+    assert table["scotland"] == 6
+    assert table["spain"] == 16
+    assert sorted(table.values()) == list(range(1, 26))
+
+
+def test_parse_world_rankings_not_confused_by_movers_or_other_keys():
+    # movers (same entry shape) and rankingsList come BEFORE rankings here.
+    movers = [_entry(16, "spain"), _entry(17, "tonga")]
+    page = _rankings_page(
+        [_entry(1, "south-africa"), _entry(2, "new-zealand")],
+        before="movers:"
+        + __import__("json").dumps(movers)
+        + ", rankingsList:[], myRankings:[], rankingsLabel:\"9 Nov 2026\", ",
+    )
+    page = "<h2>World Rankings: All eyes on Paris</h2>" + page
+    assert parse_world_rankings(page) == {"south-africa": 1, "new-zealand": 2}
+
+
+def test_parse_world_rankings_skips_rankings_array_of_other_shape():
+    page = (
+        "<script>var a = { rankings:[{\"x\":1}] };</script>"
+        + _rankings_page([_entry(1, "fiji")])
+    )
+    assert parse_world_rankings(page) == {"fiji": 1}
+
+
+def test_parse_world_rankings_missing_array_raises():
+    with pytest.raises(ParseError):
+        parse_world_rankings(NO_WORLD_RANKINGS.read_text(encoding="utf-8"))
+    with pytest.raises(ParseError):
+        parse_world_rankings("<html><body>nothing</body></html>")
+
+
+def test_parse_world_rankings_malformed_raises():
+    with pytest.raises(ParseError):
+        parse_world_rankings('<script>x = { rankings:[{"p":1,"n":"A","u":"a",')
+
+
+def test_parse_world_rankings_deeply_nested_raises_parse_error():
+    deep = "[" * 100_000 + "]" * 100_000
+    with pytest.raises(ParseError):
+        parse_world_rankings("<script>x = { rankings:[" + deep + "] }</script>")
+
+
+def test_parse_world_rankings_huge_raw_int_raises_parse_error():
+    page = '<script>x = { rankings:[{"p":' + "9" * 5000 + ',"n":"A","u":"a","pts":1}] }'
+    with pytest.raises(ParseError):
+        parse_world_rankings(page)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"p": "²", "u": "a"},
+        {"p": "١٢", "u": "a"},
+        {"p": "9" * 5000, "u": "a"},
+        {"p": 10**12, "u": "a"},
+        {"p": 0, "u": "a"},
+        {"p": -1, "u": "a"},
+        {"p": 1.5, "u": "a"},
+        {"p": True, "u": "a"},
+        {"p": None, "u": "a"},
+        {"p": 3, "u": ""},
+        {"p": 3, "u": "   "},
+        {"p": 3, "u": 7},
+        {"p": 3},
+        "not-a-dict",
+    ],
+    ids=["superscript", "arabic-indic", "5000-digit-str", "huge-int", "zero",
+         "negative", "float", "bool", "null", "empty-slug", "blank-slug",
+         "int-slug", "no-slug", "string-entry"],
+)  # fmt: skip
+def test_parse_world_rankings_skips_bad_entries(bad):
+    if isinstance(bad, dict):
+        bad = {"n": "Bad", "pts": 1.0, **bad}
+    page = _rankings_page([_entry(1, "south-africa"), bad, _entry(2, "new-zealand")])
+    assert parse_world_rankings(page) == {"south-africa": 1, "new-zealand": 2}
+
+
+def test_parse_world_rankings_digit_string_position_ok():
+    page = _rankings_page([{"p": " 4 ", "n": "France", "u": "france", "pts": 1}])
+    assert parse_world_rankings(page) == {"france": 4}
+
+
+def test_parse_world_rankings_duplicate_slug_keeps_first():
+    page = _rankings_page([_entry(1, "fiji"), _entry(9, "fiji"), _entry(2, "tonga")])
+    assert parse_world_rankings(page) == {"fiji": 1, "tonga": 2}
+
+
+def test_parse_world_rankings_html_entity_escaped():
+    html = _rankings_html().replace('"', "&quot;")
+    assert len(parse_world_rankings(html)) == 25

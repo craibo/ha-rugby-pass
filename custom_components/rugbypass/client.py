@@ -8,7 +8,12 @@ import aiohttp
 
 from .const import USER_AGENT
 from .models import Game
-from .source import ParseError, parse_games, parse_standings
+from .source import (
+    ParseError,
+    parse_games,
+    parse_standings,
+    parse_world_rankings,
+)
 
 BASE_URL = "https://www.rugbypass.com"
 REQUEST_TIMEOUT = 15
@@ -25,6 +30,13 @@ COMPETITIONS: dict[str, str] = {
     "nations-championship": "Nations Championship",
     "internationals": "Internationals",
 }
+
+# International competitions rank teams by the World Rugby men's ranking
+# (by team slug) instead of a league table.
+WORLD_RANKING_COMPETITIONS = frozenset(
+    {"rugby-world-cup", "nations-championship", "internationals"}
+)
+WORLD_RANKINGS_URL = f"{BASE_URL}/mens-world-rankings/"
 
 
 class RugbyPassError(Exception):
@@ -67,6 +79,20 @@ class RugbyPassClient:
             return parse_standings(page)
         except ParseError as err:
             raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err
+
+    async def fetch_world_rankings(self) -> dict[str, int]:
+        """Fetch the World Rugby men's ranking (team slug -> position).
+
+        Any failure, HTTP 404 included, raises ``RugbyPassError``.
+        """
+        page = await self._get(WORLD_RANKINGS_URL)
+        assert page is not None
+        try:
+            return parse_world_rankings(page)
+        except ParseError as err:
+            raise RugbyPassError(
+                f"Unexpected page format at {WORLD_RANKINGS_URL}: {err}"
+            ) from err
 
     async def _get(self, url: str, *, missing_ok: bool = False) -> str | None:
         """GET a page as text; any failure is a ``RugbyPassError``.

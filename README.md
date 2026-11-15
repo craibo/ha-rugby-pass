@@ -8,7 +8,7 @@ Polling is deliberately light: every 60 seconds only while a followed game is li
 
 One page is fetched per selected competition, however many teams you follow, and each competition is handled separately: if one page fails, that competition keeps its last known games while the others still update. When every page fails, the integration retries every 5 minutes; entities go unavailable only after 3 consecutive failures, and after that the retry delay doubles (10, 20, then 40 minutes), never waiting longer than the normal polling interval. The normal interval returns as soon as a fetch succeeds.
 
-League positions add one standings request per selected competition per hour (the first on start-up), whatever the polling interval; a competition without a standings page (Internationals) is also checked only once an hour. Standings requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed standings request never affects the entities or the polling: the last known positions are kept and the request is retried after 10 minutes.
+Ranks add, at most once an hour (the first on start-up) and whatever the polling interval, one standings request per selected league competition, plus one request for the world rankings page when the Rugby World Cup, Nations Championship or Internationals is selected (however many of them). These requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed rank request never affects the entities or the polling: the last known ranks are kept and the request is retried after 10 minutes.
 
 Requires Home Assistant 2024.11 or newer.
 
@@ -46,11 +46,16 @@ Seven sensors per team:
 | Next game | Kick-off date and time (timestamp) |
 | Previous game 1 to 5 | Result from the team's side, for example `W 24–17` (1 is the most recent) |
 
-Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute`, `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (league-table positions, or none when unknown; see [League positions](#league-positions)).
+Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute`, `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)).
 
-### League positions
+### Ranks
 
-`home_rank` and `away_rank` are each team's current position in the competition's league table, read from the RugbyPass standings page (for example `https://www.rugbypass.com/united-rugby-championship/standings/`). They are the positions as of the last standings refresh, which is at most about an hour old, not the positions at the time the match was played, so a previous result shows where the opposition sits today. They are left empty when the position is unknown: for Internationals (which have no standings page), for pool-based competitions such as the Nations Championship and the Rugby World Cup pool stage (pool positions would read as league positions, so they are not used), and for a team that is not in the table.
+`home_rank` and `away_rank` are each team's current rank, which depends on the game's competition:
+
+- **Rugby World Cup, Nations Championship and Internationals:** the team's World Rugby men's ranking, as published by RugbyPass at `https://www.rugbypass.com/mens-world-rankings/`. Teams are matched by their RugbyPass team slug. Other tournaments that only appear through Internationals (for example the Pacific Nations Cup) also use the world ranking. Teams without a world ranking (for example Gibraltar, or club sides on tour) show nothing.
+- **All other competitions:** the team's position in the competition's league table, read from its RugbyPass standings page (for example `https://www.rugbypass.com/united-rugby-championship/standings/`). Six Nations and The Rugby Championship use their own tables.
+
+Ranks are refreshed at most hourly (league tables change after each round, world rankings weekly after matches), so they are the ranks as of the last refresh, not the ranks at the time the match was played: a previous result shows where the opposition stands today. A rank is left empty when it is unknown, for example for a team that is not in the table or not ranked.
 
 ## Game card
 
@@ -61,7 +66,7 @@ type: custom:rugbypass-game-card
 entity: sensor.leinster_next_game
 ```
 
-It shows both teams with logos, each name followed by the team's league position in lighter text when known (for example `Leinster 3rd`), and:
+It shows both teams with logos, each name followed by the team's rank (league position or world ranking, see [Ranks](#ranks)) in lighter text when known (for example `Leinster 3rd`), and:
 
 - **Upcoming:** kick-off date and time.
 - **Live:** current score and a period/minute badge.
@@ -103,7 +108,7 @@ previous:
   - sensor.leinster_previous_game_5
 ```
 
-At least one of `next`, `current` or a non-empty `previous` is required; entries in `previous` beyond five are ignored. Each previous result shows the date, the opposition, its current league position and the venue in brackets (for example `Munster 3rd (Stade de France)`; the position and venue are in lighter text and left out when unknown), and the score coloured green for a win, red for a loss and amber for a draw. Slots with no game are left out, so a team with fewer than five past games shows fewer rows. With nothing live or scheduled the top block reads "No game". The top block shows league positions after both team names, as in the game card. Positions use English ordinals (1st, 2nd, 3rd) when Home Assistant's language is English and `#1`, `#2` otherwise.
+At least one of `next`, `current` or a non-empty `previous` is required; entries in `previous` beyond five are ignored. Each previous result shows the date, the opposition, its current rank (league position or world ranking) and the venue in brackets (for example `Munster 3rd (Stade de France)`; the rank and venue are in lighter text and left out when unknown), and the score coloured green for a win, red for a loss and amber for a draw. Slots with no game are left out, so a team with fewer than five past games shows fewer rows. With nothing live or scheduled the top block reads "No game". The top block shows ranks after both team names, as in the game card. Ranks use English ordinals (1st, 2nd, 3rd) when Home Assistant's language is English and `#1`, `#2` otherwise.
 
 **Visual editor:** pick any one of the team's game sensors and the editor fills in the other six from the entity-id naming (`..._current_game`, `..._next_game`, `..._previous_game_1` to `5`). If you have renamed the entities so they no longer follow that pattern, set the entity ids explicitly in YAML as above. If the sensor you pick does not follow the naming pattern, the editor sets only `next`; add `current` and `previous` in YAML.
 

@@ -3,7 +3,7 @@ export type TeamView = {
   name: string;
   logo?: string;
   score?: number;
-  /** League-table position (from RugbyPass standings), if known. */
+  /** Rank (league position or world ranking, from RugbyPass), if known. */
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd" or "#3". */
   rankLabel?: string;
@@ -34,11 +34,11 @@ const num = (v: unknown): number | undefined =>
 
 const ORDINAL_SUFFIX: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
 
-/** A positive integer league position, else undefined. */
+/** A positive integer rank, else undefined. */
 export const rankOf = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isInteger(v) && v > 0 ? v : undefined;
 
-/** League position as text: English ordinals ("1st", "12th") or "#n" for other locales. */
+/** Rank as text: English ordinals ("1st", "12th") or "#n" for other locales. */
 export function formatRank(rank: number, locale: string): string {
   if (typeof locale !== "string" || !/^en(?:$|[-_])/i.test(locale)) return `#${rank}`;
   let rules: Intl.PluralRules;

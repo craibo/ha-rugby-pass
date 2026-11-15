@@ -24,6 +24,15 @@ GAME_DAYS_MARKER = 'id="current-game-days"'
 # {"hasStandings", "standingsConference",
 #  "standingsData": {"groups": [...], "standings": [{"team": {"id"}, "position"}]}}
 STANDINGS_MARKER = 'id="standings-data"'
+# The men's world rankings page has no hidden element: the table is inline
+# in a Vue app's data(), as a JS object key (not JSON) followed by an array:
+#   createApp({ data() { return { ..., rankings:[{"p":1,"n":"South Africa",
+#     "u":"south-africa","pts":93.09,...}, ...], rankingsList:[], ...,
+#     movers:[ same shape, a subset ], ... } } })
+# Only the key exactly named "rankings" whose array holds entries with
+# p/n/u/pts is the table ("movers" has the same shape but is a subset).
+_RANKINGS_KEY = re.compile(r"(?<![\w$])rankings\s*:\s*(?=\[)")
+_RANKING_KEYS = frozenset({"p", "n", "u", "pts"})
 
 _DECODER = json.JSONDecoder()
 _LEADING_DIGITS = re.compile(r"\d+")
@@ -137,6 +146,51 @@ def _parse_standings(page: str) -> dict[int, int]:
             continue
         positions.setdefault(team_id, position)
     return positions
+
+
+def parse_world_rankings(page: str) -> dict[str, int]:
+    """Parse the RugbyPass men's world rankings page: team slug -> position.
+
+    Entries without a non-empty slug or a usable position (>= 1) are
+    skipped; for a repeated slug the first entry wins.
+    """
+    try:
+        entries = _extract_rankings(page)
+        if entries is None:
+            entries = _extract_rankings(html_lib.unescape(page))
+    except (RecursionError, ValueError, TypeError) as err:
+        raise ParseError(f"Unusable world rankings: {type(err).__name__}") from err
+    if entries is None:
+        raise ParseError("No inline world rankings found")
+    positions: dict[str, int] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        slug = entry.get("u")
+        position = _as_int(entry.get("p"))
+        if not isinstance(slug, str) or not slug.strip():
+            continue
+        if position is None or position < 1:
+            continue
+        positions.setdefault(slug.strip(), position)
+    return positions
+
+
+def _extract_rankings(page: str) -> list[Any] | None:
+    """The first ``rankings:[...]`` array shaped like the rankings table."""
+    for match in _RANKINGS_KEY.finditer(page):
+        try:
+            data, _ = _DECODER.raw_decode(page, match.end())
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(data, list)
+            and data
+            and isinstance(data[0], dict)
+            and _RANKING_KEYS <= data[0].keys()
+        ):
+            return data
+    return None
 
 
 _MAX_INT_DIGITS = 9
