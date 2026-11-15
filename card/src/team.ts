@@ -13,7 +13,7 @@ export type PreviousRow = {
   date: string;
   opposition: string;
   location?: string;
-  /** The opposition's league-table position, if known. */
+  /** The opposition's rank (league position or world ranking), if known. */
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd". */
   rankLabel?: string;
