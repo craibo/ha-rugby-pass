@@ -21,7 +21,7 @@ An **unofficial** Home Assistant integration that follows rugby teams. It gives 
 ## Features
 
 - **Follow your teams**: pick competitions, then the teams you care about; each team becomes a Home Assistant device
-- **Current, next and previous five games**: opposition, kick-off date and time, venue, score and period (Kick off, First Half, Second Half, Result)
+- **Current, next and previous five games**: opposition, kick-off date and time, venue, score and period (Kick off, First Half, Half Time, Second Half, Result, Postponed, Cancelled)
 - **League positions and world rankings**: shown after team names (league table for league competitions, World Rugby men's ranking for the Rugby World Cup, Nations Championship and Internationals)
 - **Two bundled Lovelace cards**: a game card and a team card (current or next game plus the previous five results), with visual editors and no separate download
 - **Light on the data source**: adaptive polling, from every 60 seconds while a followed game is live to every 6 hours when nothing is on (see [Polling and data usage](#polling-and-data-usage))
@@ -74,13 +74,13 @@ Seven sensors per team:
 
 | Entity | State |
 |---|---|
-| Current game | The period (for example "First Half"), or "No game in progress" |
+| Current game | The period (Kick off, First Half, Half Time, Second Half, Result, Postponed or Cancelled; for example "First Half"), or "No game in progress" |
 | Next game | Kick-off date and time (timestamp) |
 | Previous game 1 to 5 | Result from the team's side, for example `W 24–17` (1 is the most recent) |
 
 Current game and Previous game 1 to 5 use a rugby ball icon. Next game keeps Home Assistant's default clock icon (it is a timestamp sensor).
 
-Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute`, `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)).
+Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute` (as reported by the data source; frozen during Half Time), `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)).
 
 ### Ranks
 
@@ -103,7 +103,7 @@ entity: sensor.leinster_next_game
 It shows both teams with logos, each name followed by the team's rank (league position or world ranking, see [Ranks](#ranks)) in lighter text when known (for example `Leinster 3rd`), and:
 
 - **Upcoming:** kick-off date and time, with the venue (when known) in lighter text under the time.
-- **Live:** current score and a period/minute badge.
+- **Live:** current score and a period/minute badge (for example `Second Half 63'`); at half-time the badge is just `Half Time`, without a minute.
 - **Final:** the final score.
 
 When the card shows a current (live) or previous game, clicking the game block opens the match page on the website in a new browser tab. The website cannot be embedded in Home Assistant (it forbids framing), so a new tab is used. The next game is not clickable.
@@ -160,8 +160,7 @@ Ranks add, at most once an hour (the first on start-up) and whatever the polling
 
 ## Known limitations
 
-- The data source has no period field, so the period is derived from the minute: First Half up to minute 40, Second Half after. The half-time boundary is a guess.
-- Live-game handling is based on an assumption about the data shape; no live game was available when the parser was written.
+- The period comes from the data source's own status text (first half, halftime, second half, result). The minute is only used as a fallback for statuses the integration does not recognise (for example extra time), which are treated as First Half up to minute 40 and Second Half after. These values were verified against a real match on 2026-11-15.
 - A postponed or cancelled game is not shown in any sensor; the Next game sensor skips to the next playable fixture.
 - Champions Cup is not supported yet.
 - Relies on page scraping and may stop working if the website changes its pages.
