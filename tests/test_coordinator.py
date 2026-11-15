@@ -61,7 +61,8 @@ def test_interval_boundaries():
     assert compute_interval([g(1, timedelta(hours=2, seconds=1))], NOW) == timedelta(
         seconds=60
     )
-    assert compute_interval([g(1, timedelta(0))], NOW) == timedelta(hours=6)
+    # Kick-off reached but not yet flagged live: in play, poll at the live rate.
+    assert compute_interval([g(1, timedelta(0))], NOW) == timedelta(seconds=60)
 
 
 def test_interval_ignores_played_and_postponed():
@@ -208,3 +209,175 @@ async def test_first_refresh_failure_raises(hass):
             await coord._async_update_data()
         await coord.async_refresh()
     assert not coord.last_update_success
+
+
+# --- in play: past kick-off but not yet flagged live -------------------------
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [timedelta(seconds=-5), timedelta(hours=-2, minutes=-59), timedelta(hours=-3)],
+)
+def test_interval_in_play_before_live_flag(delta):
+    assert compute_interval([g(1, delta)], NOW) == timedelta(seconds=60)
+
+
+def test_interval_in_play_beats_future_fixture():
+    games = [g(1, timedelta(hours=10)), g(2, timedelta(seconds=-5))]
+    assert compute_interval(games, NOW) == timedelta(seconds=60)
+
+
+def test_interval_past_window_not_in_play():
+    assert compute_interval([g(1, timedelta(hours=-3, minutes=-1))], NOW) == timedelta(
+        hours=6
+    )
+    # falls through to the other tiers
+    games = [g(1, timedelta(hours=-3, minutes=-1)), g(2, timedelta(minutes=30))]
+    assert compute_interval(games, NOW) == timedelta(minutes=15)
+
+
+@pytest.mark.parametrize("status", ["result", "postponed", "canceled"])
+def test_interval_finished_or_off_games_not_in_play(status):
+    assert compute_interval(
+        [g(1, timedelta(minutes=-30), status=status)], NOW
+    ) == timedelta(hours=6)
+
+
+def test_interval_in_play_does_not_clamp_idle_as_future():
+    # An in-play game must never be treated as the "next" future kick-off.
+    games = [g(1, timedelta(hours=-4)), g(2, timedelta(hours=5))]
+    assert compute_interval(games, NOW) == timedelta(hours=3)
+
+
+# --- backoff ------------------------------------------------------------------
+
+
+async def _failure_sequence(hass, game, n):
+    state = {"fail": False}
+
+    async def fetch(self, slug):
+        if state["fail"]:
+            raise RugbyPassError("boom")
+        return [game]
+
+    coord = make(hass)
+    seen = []
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", fetch),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        normal = coord.update_interval
+        state["fail"] = True
+        for _ in range(n):
+            await coord.async_refresh()
+            seen.append(coord.update_interval)
+        state["fail"] = False
+        await coord.async_refresh()
+        assert coord.update_interval == normal
+        assert coord.last_update_success
+    return normal, seen
+
+
+async def test_backoff_sequence(hass):
+    normal, seen = await _failure_sequence(hass, g(1, timedelta(days=1)), 8)
+    assert normal == timedelta(hours=6)
+    assert [s.total_seconds() / 60 for s in seen] == [5, 5, 5, 10, 20, 40, 40, 40]
+
+
+async def test_backoff_never_exceeds_computed_interval(hass):
+    normal, seen = await _failure_sequence(
+        hass, g(1, timedelta(hours=2, minutes=15)), 6
+    )
+    assert normal == timedelta(minutes=15)
+    assert [s.total_seconds() / 60 for s in seen] == [5, 5, 5, 10, 15, 15]
+
+
+async def test_backoff_while_live_stays_at_live_interval(hass):
+    _, seen = await _failure_sequence(
+        hass, g(1, timedelta(minutes=-5), live=True), 5
+    )
+    assert all(s == timedelta(seconds=60) for s in seen)
+
+
+# --- per-competition isolation -------------------------------------------------
+
+
+def _comp_fetch(results, failing):
+    async def fetch(self, slug):
+        if slug in failing:
+            raise RugbyPassError(f"{slug} down")
+        return results[slug]
+
+    return fetch
+
+
+async def test_one_competition_failing_keeps_its_games(hass):
+    a_game = g(1, timedelta(days=1), home=T1, away=T2)
+    b_game = g(2, timedelta(days=2), home=T3, away=T2)
+    results = {"a": [a_game], "b": [b_game]}
+    failing: set[str] = set()
+    coord = make(hass, teams=(1, 3), comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, failing)),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        assert coord.data[3].next.id == 2
+
+        failing.add("b")
+        results["a"] = [g(5, timedelta(hours=20), home=T1, away=T2)]
+        for _ in range(4):
+            await coord.async_refresh()
+            assert coord.last_update_success
+            assert coord.data[1].next.id == 5  # fresh from a
+            assert coord.data[3].next.id == 2  # kept from b
+            assert {x.id for x in coord.games} == {5, 2}
+
+        failing.clear()
+        results["b"] = [g(6, timedelta(days=3), home=T3, away=T2)]
+        await coord.async_refresh()
+        assert coord.data[3].next.id == 6
+
+
+async def test_all_competitions_failing_counts_as_failure(hass):
+    results = {"a": [g(1, timedelta(days=1))], "b": [g(2, timedelta(days=2), home=T3)]}
+    failing: set[str] = set()
+    coord = make(hass, teams=(1, 3), comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, failing)),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        good = coord.data
+        failing.update({"a", "b"})
+        await coord.async_refresh()
+        await coord.async_refresh()
+        assert coord.last_update_success and coord.data is good
+        await coord.async_refresh()
+        assert not coord.last_update_success
+        assert coord.data is good
+
+
+async def test_all_competitions_failing_first_refresh_raises(hass):
+    coord = make(hass, comps=("a", "b"))
+    with patch.object(RugbyPassClient, "fetch_competition", _comp_fetch({}, {"a", "b"})):
+        with pytest.raises(UpdateFailed):
+            await coord._async_update_data()
+
+
+async def test_competition_failing_three_times_without_data_fails(hass):
+    results = {"a": [g(1, timedelta(days=1))]}
+    coord = make(hass, teams=(1, 3), comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _comp_fetch(results, {"b"})),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        assert coord.last_update_success
+        assert coord.data[1].next.id == 1
+        assert coord.update_interval <= timedelta(minutes=5)
+        await coord.async_refresh()
+        assert coord.last_update_success
+        await coord.async_refresh()
+        assert not coord.last_update_success
