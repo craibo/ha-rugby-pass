@@ -109,3 +109,5 @@ The built bundle is committed, and CI fails if it is out of date. Release steps 
 ## Licence
 
 Released under the [MIT License](LICENSE).
+
+The RugbyPass name and logo (`custom_components/rugbypass/brand/icon.png`) are trademarks of their owner and are used here only to identify the service this integration reads from. This project is not affiliated with or endorsed by RugbyPass; the MIT licence above does not cover the logo.
