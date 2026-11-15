@@ -1,6 +1,6 @@
 # RugbyPass for Home Assistant
 
-An **unofficial** Home Assistant integration that follows rugby teams using the public [RugbyPass](https://www.rugbypass.com) fixtures and results pages. It gives each team a device with its current, next and previous five games, plus a bundled Lovelace card.
+An **unofficial** Home Assistant integration that follows rugby teams using the public [RugbyPass](https://www.rugbypass.com) fixtures and results pages. It gives each team a device with its current, next and previous five games, plus two bundled Lovelace cards: a game card and a team card.
 
 > **Disclaimer:** This project is not affiliated with, endorsed by or connected to RugbyPass. RugbyPass has no public API, so the integration reads the same public fixture pages a browser would. It may break at any time if the site changes. Please check RugbyPass's terms of use before using it.
 
@@ -78,6 +78,27 @@ content: >
 ```
 
 Replace `sensor.leinster_next_game` with your own entity ID.
+
+## Team card
+
+One card per team: the current game if one is live, otherwise the next game, with the team's previous five results listed underneath. It ships in the same bundle as the game card, so no extra setup is needed. Add it from the card picker or in YAML:
+
+```yaml
+type: custom:rugbypass-team-card
+title: Leinster            # optional
+current: sensor.leinster_current_game
+next: sensor.leinster_next_game
+previous:
+  - sensor.leinster_previous_game_1
+  - sensor.leinster_previous_game_2
+  - sensor.leinster_previous_game_3
+  - sensor.leinster_previous_game_4
+  - sensor.leinster_previous_game_5
+```
+
+At least one of `next`, `current` or a non-empty `previous` is required; entries in `previous` beyond five are ignored. Each previous result shows the date, `vs` (home) or `at` (away) and the opposition, and the score coloured green for a win, red for a loss and amber for a draw. Slots with no game are left out, so a team with fewer than five past games shows fewer rows. With nothing live or scheduled the top block reads "No game".
+
+**Visual editor:** pick any one of the team's game sensors and the editor fills in the other six from the entity-id naming (`..._current_game`, `..._next_game`, `..._previous_game_1` to `5`). If you have renamed the entities so they no longer follow that pattern, set the entity ids explicitly in YAML as above.
 
 ## Known limitations
 
