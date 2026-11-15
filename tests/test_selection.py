@@ -50,7 +50,7 @@ def test_matches_by_id_home_or_away():
 
 
 def test_previous_newest_first_capped_at_five():
-    games = [g(i, -i, status="result") for i in range(1, 8)]
+    games = [g(i, -i, status="result") for i in (3, 1, 7, 2, 6, 4, 5)]
     prev = select_team_games(games, 1, NOW).previous
     assert [x.id for x in prev] == [1, 2, 3, 4, 5]
 
@@ -107,3 +107,13 @@ def test_merge_prefers_live_or_played_over_fixture():
     out = merge_games([fixture, g(2, 1)], [played, live])
     assert out == [played, live]
     assert merge_games([played], [fixture]) == [played]
+
+
+def test_previous_exactly_five():
+    games = [g(i, -i, status="result") for i in (4, 2, 5, 1, 3)]
+    assert [x.id for x in select_team_games(games, 1, NOW).previous] == [1, 2, 3, 4, 5]
+
+
+def test_current_all_live_future_returns_earliest():
+    games = [g(1, 2, live=True), g(2, 1, live=True), g(3, 3, live=True)]
+    assert select_team_games(games, 1, NOW).current.id == 2

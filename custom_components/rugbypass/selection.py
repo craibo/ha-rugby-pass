@@ -30,9 +30,13 @@ def select_team_games(games: list[Game], team_id: int, now: datetime) -> TeamGam
 
     live = [g for g in mine if g.live and g.status not in _EXCLUDED]
     started = [g for g in live if g.kickoff <= now]
-    current = max(started or live, key=lambda g: g.kickoff, default=None)
-    if started == [] and live:
+    # Clock-skew fallback: a live game with a future kickoff still counts.
+    if started:
+        current = max(started, key=lambda g: g.kickoff)
+    elif live:
         current = min(live, key=lambda g: g.kickoff)
+    else:
+        current = None
 
     upcoming = [
         g
