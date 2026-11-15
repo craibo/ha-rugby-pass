@@ -83,3 +83,16 @@ async def test_list_competitions():
         comps = RugbyPassClient(session).list_competitions()
     assert comps == COMPETITIONS
     assert comps["united-rugby-championship"] == "United Rugby Championship"
+
+
+def test_competitions_slugs():
+    assert set(COMPETITIONS) == {
+        "united-rugby-championship",
+        "top-14",
+        "six-nations",
+        "rugby-world-cup",
+        "premiership",
+        "the-rugby-championship",
+        "super-rugby",
+        "internationals",
+    }

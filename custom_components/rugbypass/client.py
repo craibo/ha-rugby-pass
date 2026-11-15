@@ -19,6 +19,10 @@ COMPETITIONS: dict[str, str] = {
     "top-14": "Top 14",
     "six-nations": "Six Nations",
     "rugby-world-cup": "Rugby World Cup",
+    "premiership": "Gallagher Premiership",
+    "the-rugby-championship": "The Rugby Championship",
+    "super-rugby": "Super Rugby Pacific",
+    "internationals": "Internationals",
 }
 
 
