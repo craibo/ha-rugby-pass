@@ -2,9 +2,9 @@
 
 An **unofficial** Home Assistant integration that follows rugby teams using the public [RugbyPass](https://www.rugbypass.com) fixtures and results pages. It gives each team a device with its current, next and previous five games, plus a bundled Lovelace card.
 
-> **Disclaimer:** This project is not affiliated with, endorsed by or connected to RugbyPass. RugbyPass has no public API, so the integration reads the same public fixture pages a browser would. It may break at any time if the site changes. Please check RugbyPass's terms of use before using it, and keep it to personal use.
+> **Disclaimer:** This project is not affiliated with, endorsed by or connected to RugbyPass. RugbyPass has no public API, so the integration reads the same public fixture pages a browser would. It may break at any time if the site changes. Please check RugbyPass's terms of use before using it.
 
-Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. One page is fetched per selected competition, however many teams you follow.
+Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. The 6-hour idle interval is shortened so the integration wakes no later than 2 hours before the next kick-off. After a failed fetch it retries every 5 minutes until it succeeds; entities go unavailable only after 3 consecutive failures. One page is fetched per selected competition, however many teams you follow.
 
 Requires Home Assistant 2024.11 or newer.
 
@@ -65,10 +65,14 @@ Current game is empty when nothing is live, so use a Next game or Previous game 
 ```yaml
 type: markdown
 content: >
+  {% if has_value('sensor.leinster_next_game') %}
   {% set g = states.sensor.leinster_next_game %}
   **{{ g.attributes.home_team }}** vs **{{ g.attributes.away_team }}**
   {{ as_timestamp(g.state) | timestamp_custom('%a %d %b, %H:%M') }}
   at {{ g.attributes.venue }}
+  {% else %}
+  No game scheduled
+  {% endif %}
 ```
 
 Replace `sensor.leinster_next_game` with your own entity ID.

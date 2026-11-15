@@ -1,6 +1,10 @@
 # Releasing and verifying
 
+> **Status as of this commit (delete once released):** v0.1.0 has NOT been tagged or released, `release.yml` has never run, and nothing has been installed on a Home Assistant instance yet. The steps below are still to do.
+
 Releases are cut by pushing a `v*` tag; `.github/workflows/release.yml` checks the tag against the manifest version, runs the tests and publishes a GitHub release containing `rugbypass.zip` (the contents of `custom_components/rugbypass`).
+
+The `rugbypass.zip` asset is a convenience download only. HACS installs from the repository at the tag (`hacs.json` has no `zip_release`).
 
 ## Steps
 
