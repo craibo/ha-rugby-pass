@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import RugbyPassConfigEntry, RugbyPassCoordinator, entry_teams
+from .coordinator import RugbyTrackerConfigEntry, RugbyTrackerCoordinator, entry_teams
 from .models import Game, Team, derive_period
 from .selection import MAX_PREVIOUS, TeamGames
 
@@ -98,7 +98,7 @@ SLOTS: tuple[_Slot, ...] = (
 )
 
 
-def _team_name(entry: RugbyPassConfigEntry, team_id: int) -> str:
+def _team_name(entry: RugbyTrackerConfigEntry, team_id: int) -> str:
     for source in (entry.options, entry.data):
         names = source.get("team_names") or {}
         if str(team_id) in names:
@@ -108,7 +108,7 @@ def _team_name(entry: RugbyPassConfigEntry, team_id: int) -> str:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: RugbyPassConfigEntry,
+    entry: RugbyTrackerConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create seven sensors for each followed team."""
@@ -130,14 +130,14 @@ async def async_setup_entry(
     )
 
 
-class TeamGameSensor(CoordinatorEntity[RugbyPassCoordinator], SensorEntity):
+class TeamGameSensor(CoordinatorEntity[RugbyTrackerCoordinator], SensorEntity):
     """One game slot (current, next or previous N) for a team."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: RugbyPassCoordinator,
+        coordinator: RugbyTrackerCoordinator,
         team_id: int,
         team_name: str,
         slot: _Slot,
@@ -152,7 +152,7 @@ class TeamGameSensor(CoordinatorEntity[RugbyPassCoordinator], SensorEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, str(team_id))},
             name=team_name,
-            manufacturer="RugbyPass",
+            manufacturer="Rugby Team Tracker",
             configuration_url=BASE_URL,
             entry_type=DeviceEntryType.SERVICE,
         )

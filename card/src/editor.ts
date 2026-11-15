@@ -3,10 +3,10 @@ import { LitElement, html, type TemplateResult } from "lit";
 type Config = { type?: string; entity?: string };
 
 const SCHEMA = [
-  { name: "entity", selector: { entity: { domain: "sensor", integration: "rugbypass" } } },
+  { name: "entity", selector: { entity: { domain: "sensor", integration: "rugby_team_tracker" } } },
 ];
 
-export class RugbyPassGameCardEditor extends LitElement {
+export class RugbyTrackerGameCardEditor extends LitElement {
   static properties = {
     _config: { state: true },
     _hass: { state: true },
@@ -46,6 +46,6 @@ export class RugbyPassGameCardEditor extends LitElement {
   }
 }
 
-if (!customElements.get("rugbypass-game-card-editor")) {
-  customElements.define("rugbypass-game-card-editor", RugbyPassGameCardEditor);
+if (!customElements.get("rugby-tracker-game-card-editor")) {
+  customElements.define("rugby-tracker-game-card-editor", RugbyTrackerGameCardEditor);
 }

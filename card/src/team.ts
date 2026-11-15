@@ -17,7 +17,7 @@ export type PreviousRow = {
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd". */
   rankLabel?: string;
-  /** Validated RugbyPass match page, if known. */
+  /** Validated data-source match page, if known. */
   matchUrl?: string;
   score: string;
   outcome: "win" | "loss" | "draw" | "unknown";
@@ -25,7 +25,7 @@ export type PreviousRow = {
 
 /** Accessible name for a previous-result row link. */
 export const previousLinkLabel = (opposition: string): string =>
-  `Open the match against ${opposition} on RugbyPass`;
+  `Open the match against ${opposition} on the website`;
 
 export type TeamCardView = { top: CardView; previous: PreviousRow[]; heading?: string };
 
@@ -60,7 +60,7 @@ export function validateTeamConfig(config: TeamConfig): TeamConfig {
       typeof config.next === "string" ||
       Array.isArray(config.previous));
   if (!present) {
-    throw new Error("rugbypass-team-card: configure at least 'next', 'current' or 'previous'");
+    throw new Error("rugby-tracker-team-card: configure at least 'next', 'current' or 'previous'");
   }
   return { ...config, previous: previous.slice(0, MAX_PREVIOUS) };
 }
@@ -159,8 +159,8 @@ export function teamCardSize(rows: number): number {
 export function teamStubConfig(states: States): TeamConfig {
   const derived = deriveTeamEntities(pickStubEntity(states));
   return derived
-    ? { type: "custom:rugbypass-team-card", ...derived }
-    : { type: "custom:rugbypass-team-card", next: "" };
+    ? { type: "custom:rugby-tracker-team-card", ...derived }
+    : { type: "custom:rugby-tracker-team-card", next: "" };
 }
 
 /** Config produced by the editor after a pick: derived entities, or only `next`. Never mutates inputs. */
@@ -170,7 +170,7 @@ export function buildEditorConfig(
   type: string | undefined,
   _old: TeamConfig | undefined,
 ): TeamConfig {
-  const config: TeamConfig = { type: type ?? "custom:rugbypass-team-card" };
+  const config: TeamConfig = { type: type ?? "custom:rugby-tracker-team-card" };
   if (title) config.title = title;
   const derived = picked ? deriveTeamEntities(picked) : undefined;
   if (derived) {

@@ -20,7 +20,7 @@ type Hass = {
   config?: { time_zone?: string };
 };
 
-export class RugbyPassTeamCard extends LitElement {
+export class RugbyTrackerTeamCard extends LitElement {
   static properties = {
     _config: { state: true },
     _hass: { state: true },
@@ -30,7 +30,7 @@ export class RugbyPassTeamCard extends LitElement {
   declare _hass?: Hass;
 
   static getConfigElement(): HTMLElement {
-    return document.createElement("rugbypass-team-card-editor");
+    return document.createElement("rugby-tracker-team-card-editor");
   }
 
   static getStubConfig(hass?: Hass): TeamConfig {
@@ -185,12 +185,12 @@ export class RugbyPassTeamCard extends LitElement {
   ];
 }
 
-if (!customElements.get("rugbypass-team-card")) {
-  customElements.define("rugbypass-team-card", RugbyPassTeamCard);
+if (!customElements.get("rugby-tracker-team-card")) {
+  customElements.define("rugby-tracker-team-card", RugbyTrackerTeamCard);
 }
 
 registerCard(window as unknown as Parameters<typeof registerCard>[0], {
-  type: "rugbypass-team-card",
-  name: "RugbyPass Team Card",
+  type: "rugby-tracker-team-card",
+  name: "Rugby Tracker Team Card",
   description: "Current or next game plus the previous five results for one team",
 });

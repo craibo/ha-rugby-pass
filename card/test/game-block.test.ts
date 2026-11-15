@@ -37,7 +37,7 @@ describe("game block link", () => {
     expect(src).toContain('target="_blank"');
     expect(src).toContain('rel="noopener noreferrer"');
     expect(r.values[0]).toBe(url);
-    expect(r.values[1]).toBe("Open the match on RugbyPass: Scotland v Wales");
+    expect(r.values[1]).toBe("Open the match on the website: Scotland v Wales");
   });
   it("has no anchor without matchUrl", () => {
     expect(flat(gameBlock(view()))).not.toContain("<a");

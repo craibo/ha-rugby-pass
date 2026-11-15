@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from custom_components.rugbypass.const import PERIODS
-from custom_components.rugbypass.models import Game, Team, derive_period
+from custom_components.rugby_team_tracker.const import PERIODS
+from custom_components.rugby_team_tracker.models import Game, Team, derive_period
 
 KICK_OFF, FIRST_HALF, SECOND_HALF, RESULT, POSTPONED, CANCELLED = PERIODS
 
@@ -42,7 +42,7 @@ def make_game(status="fixture", live=False, minute=0) -> Game:
         ({"status": "postponed", "live": True, "minute": 10}, POSTPONED),
         ({"status": "live", "live": True, "minute": 45}, SECOND_HALF),
         ({"status": "live", "live": True, "minute": 85}, SECOND_HALF),
-        # Never "Result" while RugbyPass still flags the game live.
+        # Never "Result" while the data source still flags the game live.
         ({"status": "result", "live": True, "minute": 85}, SECOND_HALF),
     ],
 )

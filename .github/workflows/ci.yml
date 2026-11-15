@@ -33,7 +33,7 @@ jobs:
           npm test
           npm run build
       - name: Committed bundle is up to date
-        run: git diff --exit-code custom_components/rugbypass/www
+        run: git diff --exit-code custom_components/rugby_team_tracker/www
 
   hacs:
     runs-on: ubuntu-latest

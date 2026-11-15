@@ -1,0 +1,12 @@
+{
+  "domain": "rugby_team_tracker",
+  "name": "Rugby Team Tracker",
+  "codeowners": ["@craibo"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http"],
+  "documentation": "https://github.com/craibo/ha-rugby-team-tracker",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/craibo/ha-rugby-team-tracker/issues",
+  "requirements": [],
+  "version": "0.5.0"
+}

@@ -11,9 +11,9 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
-from custom_components.rugbypass.const import DOMAIN
-from custom_components.rugbypass.models import Team
+from custom_components.rugby_team_tracker.client import RugbyTrackerClient, RugbyTrackerError
+from custom_components.rugby_team_tracker.const import DOMAIN
+from custom_components.rugby_team_tracker.models import Team
 
 from .test_coordinator import NOW, T1, T2, T3, g
 
@@ -24,7 +24,7 @@ T14 = "top-14"
 @pytest.fixture(autouse=True)
 def frozen_now():
     with patch(
-        "custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW
+        "custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW
     ):
         yield
 
@@ -40,7 +40,7 @@ async def fetch_ok(self, slug):
 
 
 async def fetch_fail(self, slug):
-    raise RugbyPassError("boom")
+    raise RugbyTrackerError("boom")
 
 
 async def fetch_empty(self, slug):
@@ -65,8 +65,8 @@ def team_options(result):
 
 
 async def test_full_flow(hass):
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok), patch(
-        "custom_components.rugbypass.async_setup_entry", return_value=True
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_ok), patch(
+        "custom_components.rugby_team_tracker.async_setup_entry", return_value=True
     ):
         result = await start(hass, [URC])
         assert result["step_id"] == "teams"
@@ -78,7 +78,7 @@ async def test_full_flow(hass):
             result["flow_id"], {"teams": ["2"]}
         )
         assert result["type"] is FlowResultType.CREATE_ENTRY
-        assert result["title"] == "RugbyPass"
+        assert result["title"] == "Rugby Team Tracker"
         assert result["data"] == {
             "competitions": [URC],
             "teams": [2],
@@ -87,7 +87,7 @@ async def test_full_flow(hass):
 
 
 async def test_teams_deduped_across_competitions(hass):
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_ok):
         result = await start(hass, [URC, T14])
     opts = team_options(result)
     assert list(opts) == ["1", "3", "2"]  # sorted by name
@@ -106,7 +106,7 @@ async def test_empty_competitions_rejected(hass):
 
 
 async def test_empty_teams_rejected(hass):
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_ok):
         result = await start(hass, [URC])
         with pytest.raises(vol.Invalid):
             await hass.config_entries.flow.async_configure(
@@ -115,7 +115,7 @@ async def test_empty_teams_rejected(hass):
 
 
 async def test_cannot_connect(hass):
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_fail):
         result = await start(hass, [URC])
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -123,7 +123,7 @@ async def test_cannot_connect(hass):
 
 
 async def test_no_teams(hass):
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_empty):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_empty):
         result = await start(hass, [URC])
     assert result["step_id"] == "user"
     assert result["errors"] == {"base": "no_teams"}
@@ -154,7 +154,7 @@ def make_entry(hass):
 
 async def test_options_flow_updates_and_reloads(hass):
     entry = make_entry(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_ok):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         first = entry.runtime_data
@@ -174,7 +174,7 @@ async def test_options_flow_updates_and_reloads(hass):
 
 async def test_options_flow_cannot_connect(hass):
     entry = make_entry(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_fail):
         result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
@@ -183,10 +183,10 @@ async def test_options_flow_cannot_connect(hass):
 
 async def test_options_flow_submit_does_not_refetch(hass):
     entry = make_entry(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_ok):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_ok):
         result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["errors"] == {}
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_fail):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"teams": ["1", "2"]}
         )
@@ -205,7 +205,7 @@ async def test_options_flow_down_can_still_unfollow(hass):
         },
     )
     entry.add_to_hass(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch_fail):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch_fail):
         result = await hass.config_entries.options.async_init(entry.entry_id)
         assert result["errors"] == {"base": "cannot_connect"}
         assert team_options(result) == {"1": "One", "2": "Two"}

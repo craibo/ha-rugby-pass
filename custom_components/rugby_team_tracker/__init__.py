@@ -1,4 +1,4 @@
-"""The RugbyPass integration."""
+"""Data models for the Rugby Team Tracker integration."""
 
 from pathlib import Path
 
@@ -11,15 +11,15 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
-from .client import RugbyPassClient
+from .client import RugbyTrackerClient
 from .const import DOMAIN
-from .coordinator import RugbyPassConfigEntry, RugbyPassCoordinator
+from .coordinator import RugbyTrackerConfigEntry, RugbyTrackerCoordinator
 
 PLATFORMS = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-CARD_URL = "/rugbypass/rugbypass-game-card.js"
-CARD_FILE = Path(__file__).parent / "www" / "rugbypass-game-card.js"
+CARD_URL = "/rugby_team_tracker/rugby-tracker-cards.js"
+CARD_FILE = Path(__file__).parent / "www" / "rugby-tracker-cards.js"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -32,10 +32,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: RugbyPassConfigEntry) -> bool:
-    """Set up RugbyPass from a config entry."""
-    client = RugbyPassClient(async_get_clientsession(hass))
-    coordinator = RugbyPassCoordinator(hass, entry, client)
+async def async_setup_entry(hass: HomeAssistant, entry: RugbyTrackerConfigEntry) -> bool:
+    """Set up Rugby Team Tracker from a config entry."""
+    client = RugbyTrackerClient(async_get_clientsession(hass))
+    coordinator = RugbyTrackerCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -43,11 +43,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: RugbyPassConfigEntry) ->
     return True
 
 
-async def _async_reload(hass: HomeAssistant, entry: RugbyPassConfigEntry) -> None:
+async def _async_reload(hass: HomeAssistant, entry: RugbyTrackerConfigEntry) -> None:
     """Reload the entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: RugbyPassConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: RugbyTrackerConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

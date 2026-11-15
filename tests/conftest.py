@@ -20,7 +20,7 @@ def frontend(hass):
     with (
         patch("homeassistant.components.http.async_setup", return_value=True),
         patch("homeassistant.components.frontend.async_setup", return_value=True),
-        patch("custom_components.rugbypass.add_extra_js_url") as add_js,
+        patch("custom_components.rugby_team_tracker.add_extra_js_url") as add_js,
     ):
         yield register, add_js
 
@@ -29,7 +29,7 @@ def frontend(hass):
 def no_standings():
     """Stub standings fetches (no league table) unless a test patches them."""
     with patch(
-        "custom_components.rugbypass.client.RugbyPassClient.fetch_standings",
+        "custom_components.rugby_team_tracker.client.RugbyTrackerClient.fetch_standings",
         AsyncMock(return_value={}),
     ) as fetch:
         yield fetch
@@ -39,7 +39,7 @@ def no_standings():
 def no_world_rankings():
     """Stub world-ranking fetches (empty table) unless a test patches them."""
     with patch(
-        "custom_components.rugbypass.client.RugbyPassClient.fetch_world_rankings",
+        "custom_components.rugby_team_tracker.client.RugbyTrackerClient.fetch_world_rankings",
         AsyncMock(return_value={}),
     ) as fetch:
         yield fetch

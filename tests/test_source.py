@@ -1,13 +1,13 @@
-"""Tests for the RugbyPass fixtures page parser."""
+"""Tests for the data source fixtures page parser."""
 
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from custom_components.rugbypass.const import PERIODS
-from custom_components.rugbypass.models import Game, derive_period
-from custom_components.rugbypass.source import (
+from custom_components.rugby_team_tracker.const import PERIODS
+from custom_components.rugby_team_tracker.models import Game, derive_period
+from custom_components.rugby_team_tracker.source import (
     GameSource,
     ParseError,
     parse_games,
@@ -207,7 +207,7 @@ def test_live_minute_never_fails_the_page(raw, expected):
 
 
 def test_minute_helper_direct():
-    from custom_components.rugbypass.source import _minute
+    from custom_components.rugby_team_tracker.source import _minute
 
     assert _minute("45+2") == 45
     assert _minute("HT") == 0

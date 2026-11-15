@@ -3,7 +3,7 @@ export type TeamView = {
   name: string;
   logo?: string;
   score?: number;
-  /** Rank (league position or world ranking, from RugbyPass), if known. */
+  /** Rank (league position or world ranking, from the data source), if known. */
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd" or "#3". */
   rankLabel?: string;
@@ -18,7 +18,7 @@ export type CardView = {
   dateLine?: string;
   /** Upcoming only: the venue, shown under the kick-off time. */
   venue?: string;
-  /** Live and final only: absolute RugbyPass match page (validated). */
+  /** Live and final only: absolute data-source match page (validated). */
   matchUrl?: string;
 };
 
@@ -36,14 +36,14 @@ const str = (v: unknown): string | undefined =>
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
-const RUGBYPASS_HOSTS = new Set(["www.rugbypass.com", "rugbypass.com"]);
+const SOURCE_HOSTS = new Set(["www.rugbypass.com", "rugbypass.com"]);
 
-/** A RugbyPass https URL (normalised), else undefined. Never throws. */
+/** A the data source https URL (normalised), else undefined. Never throws. */
 export function safeMatchUrl(value: unknown): string | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   try {
     const u = new URL(value);
-    if (u.protocol !== "https:" || !RUGBYPASS_HOSTS.has(u.hostname)) return undefined;
+    if (u.protocol !== "https:" || !SOURCE_HOSTS.has(u.hostname)) return undefined;
     if (u.username !== "" || u.password !== "" || u.port !== "") return undefined;
     return u.href;
   } catch {
@@ -53,7 +53,7 @@ export function safeMatchUrl(value: unknown): string | undefined {
 
 /** Accessible name for a match link. */
 export function matchLinkLabel(home: string, away: string): string {
-  return `Open the match on RugbyPass: ${home} v ${away}`;
+  return `Open the match on the website: ${home} v ${away}`;
 }
 
 const venueOf = (v: unknown): string | undefined =>

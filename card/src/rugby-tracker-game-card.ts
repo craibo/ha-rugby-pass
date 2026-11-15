@@ -1,6 +1,6 @@
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import "./editor";
-import "./rugbypass-team-card";
+import "./rugby-tracker-team-card";
 import { entityChanged, pickStubEntity } from "./editor-helpers";
 import { registerCard } from "./register";
 import { gameBlock, gameBlockStyles } from "./game-block";
@@ -13,7 +13,7 @@ type Hass = {
   config?: { time_zone?: string };
 };
 
-export class RugbyPassGameCard extends LitElement {
+export class RugbyTrackerGameCard extends LitElement {
   static properties = {
     _config: { state: true },
     _hass: { state: true },
@@ -23,11 +23,11 @@ export class RugbyPassGameCard extends LitElement {
   declare _hass?: Hass;
 
   static getConfigElement(): HTMLElement {
-    return document.createElement("rugbypass-game-card-editor");
+    return document.createElement("rugby-tracker-game-card-editor");
   }
 
   static getStubConfig(hass?: Hass): Config {
-    return { type: "custom:rugbypass-game-card", entity: pickStubEntity(hass?.states) };
+    return { type: "custom:rugby-tracker-game-card", entity: pickStubEntity(hass?.states) };
   }
 
   protected shouldUpdate(changed: PropertyValues): boolean {
@@ -42,7 +42,7 @@ export class RugbyPassGameCard extends LitElement {
 
   setConfig(config: Config): void {
     if (!config || typeof config.entity !== "string" || !config.entity) {
-      throw new Error("rugbypass-game-card: 'entity' is required");
+      throw new Error("rugby-tracker-game-card: 'entity' is required");
     }
     this._config = config;
   }
@@ -69,12 +69,12 @@ export class RugbyPassGameCard extends LitElement {
   static styles = gameBlockStyles;
 }
 
-if (!customElements.get("rugbypass-game-card")) {
-  customElements.define("rugbypass-game-card", RugbyPassGameCard);
+if (!customElements.get("rugby-tracker-game-card")) {
+  customElements.define("rugby-tracker-game-card", RugbyTrackerGameCard);
 }
 
 registerCard(window as unknown as Parameters<typeof registerCard>[0], {
-  type: "rugbypass-game-card",
-  name: "RugbyPass Game Card",
-  description: "Shows a RugbyPass game: kick-off, live score or final result.",
+  type: "rugby-tracker-game-card",
+  name: "Rugby Tracker Game Card",
+  description: "Shows a rugby game: kick-off, live score or final result.",
 });

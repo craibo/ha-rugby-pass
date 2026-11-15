@@ -9,9 +9,9 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
-from custom_components.rugbypass.const import DOMAIN
-from custom_components.rugbypass.coordinator import RugbyPassCoordinator
+from custom_components.rugby_team_tracker.client import RugbyTrackerClient, RugbyTrackerError
+from custom_components.rugby_team_tracker.const import DOMAIN
+from custom_components.rugby_team_tracker.coordinator import RugbyTrackerCoordinator
 
 from .test_coordinator import NOW, g
 
@@ -20,7 +20,7 @@ from .test_coordinator import NOW, g
 def frozen_now():
     """Select games against the fixtures' NOW, not the real clock."""
     with patch(
-        "custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW
+        "custom_components.rugby_team_tracker.coordinator.dt_util.utcnow", return_value=NOW
     ):
         yield
 
@@ -39,11 +39,11 @@ async def test_setup_and_unload(hass):
         return [g(1, timedelta(days=1))]
 
     entry = entry_for(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         assert entry.state is ConfigEntryState.LOADED
-        assert isinstance(entry.runtime_data, RugbyPassCoordinator)
+        assert isinstance(entry.runtime_data, RugbyTrackerCoordinator)
         assert entry.runtime_data.data[1].next.id == 1
 
         assert await hass.config_entries.async_unload(entry.entry_id)
@@ -53,10 +53,10 @@ async def test_setup_and_unload(hass):
 
 async def test_first_refresh_failure_retries(hass):
     async def fetch(self, slug):
-        raise RugbyPassError("boom")
+        raise RugbyTrackerError("boom")
 
     entry = entry_for(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch):
         assert not await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
 
@@ -66,7 +66,7 @@ async def test_options_change_reloads(hass):
         return [g(1, timedelta(days=1))]
 
     entry = entry_for(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with patch.object(RugbyTrackerClient, "fetch_competition", fetch):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         first = entry.runtime_data

@@ -1,4 +1,4 @@
-"""HTTP client for the RugbyPass fixtures pages."""
+"""HTTP client for the data source fixtures pages."""
 
 from __future__ import annotations
 
@@ -39,12 +39,12 @@ WORLD_RANKING_COMPETITIONS = frozenset(
 WORLD_RANKINGS_URL = f"{BASE_URL}/mens-world-rankings/"
 
 
-class RugbyPassError(Exception):
+class RugbyTrackerError(Exception):
     """Raised when fixtures cannot be fetched or understood."""
 
 
-class RugbyPassClient:
-    """Fetches and parses competition fixtures from RugbyPass."""
+class RugbyTrackerClient:
+    """Fetches and parses competition fixtures from the data source."""
 
     def __init__(self, session: aiohttp.ClientSession) -> None:
         self._session = session
@@ -61,7 +61,7 @@ class RugbyPassClient:
         try:
             return parse_games(page)
         except ParseError as err:
-            raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err
+            raise RugbyTrackerError(f"Unexpected page format at {url}: {err}") from err
 
     async def fetch_standings(self, slug: str) -> dict[int, int]:
         """Fetch a competition's league table (team id -> position).
@@ -69,7 +69,7 @@ class RugbyPassClient:
         Empty when the competition has no standings page (HTTP 404, e.g.
         Internationals) and for pool/conference tables. Any other failure
         (other HTTP errors, timeouts, connection errors, an unexpected page)
-        raises ``RugbyPassError``.
+        raises ``RugbyTrackerError``.
         """
         url = f"{BASE_URL}/{slug}/standings/"
         page = await self._get(url, missing_ok=True)
@@ -78,24 +78,24 @@ class RugbyPassClient:
         try:
             return parse_standings(page)
         except ParseError as err:
-            raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err
+            raise RugbyTrackerError(f"Unexpected page format at {url}: {err}") from err
 
     async def fetch_world_rankings(self) -> dict[str, int]:
         """Fetch the World Rugby men's ranking (team slug -> position).
 
-        Any failure, HTTP 404 included, raises ``RugbyPassError``.
+        Any failure, HTTP 404 included, raises ``RugbyTrackerError``.
         """
         page = await self._get(WORLD_RANKINGS_URL)
         assert page is not None
         try:
             return parse_world_rankings(page)
         except ParseError as err:
-            raise RugbyPassError(
+            raise RugbyTrackerError(
                 f"Unexpected page format at {WORLD_RANKINGS_URL}: {err}"
             ) from err
 
     async def _get(self, url: str, *, missing_ok: bool = False) -> str | None:
-        """GET a page as text; any failure is a ``RugbyPassError``.
+        """GET a page as text; any failure is a ``RugbyTrackerError``.
 
         With ``missing_ok``, HTTP 404 returns None instead of raising.
         """
@@ -107,9 +107,9 @@ class RugbyPassClient:
                     if missing_ok and resp.status == 404:
                         return None
                     if resp.status != 200:
-                        raise RugbyPassError(f"{url} returned HTTP {resp.status}")
+                        raise RugbyTrackerError(f"{url} returned HTTP {resp.status}")
                     return await resp.text()
         except TimeoutError as err:
-            raise RugbyPassError(f"Timed out fetching {url}") from err
+            raise RugbyTrackerError(f"Timed out fetching {url}") from err
         except aiohttp.ClientError as err:
-            raise RugbyPassError(f"Error fetching {url}: {err}") from err
+            raise RugbyTrackerError(f"Error fetching {url}: {err}") from err
