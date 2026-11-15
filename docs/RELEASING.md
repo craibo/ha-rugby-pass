@@ -9,7 +9,7 @@ The `rugbypass.zip` asset is a convenience download only. HACS installs from the
 ## Steps
 
 1. Make sure `main` is green (CI: tests, card, hacs, hassfest).
-2. Check `custom_components/rugbypass/manifest.json` `version` matches the tag you are about to create ; bump it first if not (do this in a PR, and wait for CI to pass before tagging).
+2. Check `custom_components/rugbypass/manifest.json` `version` matches the tag you are about to create; bump it first if not (do this in a PR, and wait for CI to pass before tagging).
 3. Tag the merged `main` commit and push the tag, for example: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
 4. Confirm the Release workflow succeeded and the release has `rugbypass.zip`.
 5. In Home Assistant, update (or first install) the integration through HACS, restart HA, hard-refresh the browser, then check the integration and cards. For a first install add `https://github.com/craibo/ha-rugby-pass` as a custom repository of type Integration.
