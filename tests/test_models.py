@@ -40,6 +40,10 @@ def make_game(status="fixture", live=False, minute=0) -> Game:
         ({"status": "postponed"}, POSTPONED),
         ({"status": "canceled"}, CANCELLED),
         ({"status": "postponed", "live": True, "minute": 10}, POSTPONED),
+        ({"status": "live", "live": True, "minute": 45}, SECOND_HALF),
+        ({"status": "live", "live": True, "minute": 85}, SECOND_HALF),
+        # Never "Result" while RugbyPass still flags the game live.
+        ({"status": "result", "live": True, "minute": 85}, SECOND_HALF),
     ],
 )
 def test_derive_period(kwargs, expected):

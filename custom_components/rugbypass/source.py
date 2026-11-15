@@ -6,6 +6,8 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 import html as html_lib
 import json
+import logging
+import re
 from typing import Any, Protocol, runtime_checkable
 
 from .models import Game, Team
@@ -19,6 +21,8 @@ from .models import Game, Team
 GAME_DAYS_MARKER = 'id="current-game-days"'
 
 _DECODER = json.JSONDecoder()
+_LEADING_DIGITS = re.compile(r"\d+")
+_LOGGER = logging.getLogger(__name__)
 
 
 class ParseError(Exception):
@@ -116,10 +120,23 @@ def _score(value: Any) -> int | None:
 
 
 def _minute(value: Any) -> int:
-    """Match minute; a missing value means 0, a malformed one is an error."""
-    if value is None or value == "":
+    """Match minute; never fails the page.
+
+    Stoppage time such as "45+2" keeps its leading digits (45); anything
+    non-numeric ("HT", empty, missing) is 0.
+    """
+    if isinstance(value, bool):
         return 0
-    return int(value)
+    if isinstance(value, int):
+        return value
+    match = _LEADING_DIGITS.match(str(value or "").strip())
+    if match is None:
+        if value not in (None, ""):
+            _LOGGER.debug("Non-numeric live minute %r, using 0", value)
+        return 0
+    if match.group(0) != str(value).strip():
+        _LOGGER.debug("Live minute %r read as %s", value, match.group(0))
+    return int(match.group(0))
 
 
 def _status(raw: dict[str, Any]) -> str:

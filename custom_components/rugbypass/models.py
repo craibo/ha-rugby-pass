@@ -34,7 +34,7 @@ class Game:
     away_score: int | None
     venue: str | None
     competition: str
-    status: str  # "fixture", "result", "postponed" or "canceled"
+    status: str  # "fixture", "live", "result", "postponed" or "canceled"
     live: bool
     minute: int
     url: str

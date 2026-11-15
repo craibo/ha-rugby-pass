@@ -183,3 +183,21 @@ def test_non_array_json_raises():
     html = '<div id="current-game-days" style="display: none;">{"a":1}</div>'
     with pytest.raises(ParseError, match="not a JSON array"):
         parse_games(html)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [('"45+2"', 45), ('"HT"', 0), ('""', 0), ("null", 0), ("63", 63), ('"63"', 63)],
+)
+def test_live_minute_never_fails_the_page(raw, expected):
+    html = _fixture_html().replace('"minute":80,', f'"minute":{raw},', 1)
+    assert by_id(parse_games(html), 292585).minute == expected
+
+
+def test_minute_helper_direct():
+    from custom_components.rugbypass.source import _minute
+
+    assert _minute("45+2") == 45
+    assert _minute("HT") == 0
+    assert _minute(None) == 0
+    assert _minute(52) == 52
