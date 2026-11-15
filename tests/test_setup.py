@@ -15,7 +15,7 @@ from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
 from custom_components.rugbypass.const import DOMAIN
 from custom_components.rugbypass.coordinator import RugbyPassCoordinator
 
-from .test_coordinator import g
+from .test_coordinator import NOW, g
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +35,15 @@ def stub_config_flow():
         config_entries.HANDLERS.pop(DOMAIN, None)
     else:
         config_entries.HANDLERS[DOMAIN] = previous
+
+
+@pytest.fixture(autouse=True)
+def frozen_now():
+    """Select games against the fixtures' NOW, not the real clock."""
+    with patch(
+        "custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW
+    ):
+        yield
 
 
 def entry_for(hass):

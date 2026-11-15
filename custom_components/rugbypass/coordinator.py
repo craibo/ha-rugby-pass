@@ -78,7 +78,9 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
             lists = [await self.client.fetch_competition(s) for s in competitions]
         except RugbyPassError as err:
             self._failures += 1
-            self.update_interval = min(self.update_interval or RETRY_INTERVAL, RETRY_INTERVAL)
+            self.update_interval = min(
+                self.update_interval or RETRY_INTERVAL, RETRY_INTERVAL
+            )
             if self.data is None or self._failures >= MAX_CONSECUTIVE_FAILURES:
                 raise UpdateFailed(str(err)) from err
             _LOGGER.warning(
