@@ -8,7 +8,7 @@ import aiohttp
 
 from .const import USER_AGENT
 from .models import Game
-from .source import ParseError, parse_games
+from .source import ParseError, parse_games, parse_standings
 
 BASE_URL = "https://www.rugbypass.com"
 REQUEST_TIMEOUT = 15
@@ -43,6 +43,27 @@ class RugbyPassClient:
     async def fetch_competition(self, slug: str) -> list[Game]:
         """Fetch all games for a competition."""
         url = f"{BASE_URL}/{slug}/fixtures-results/"
+        page = await self._get(url)
+        try:
+            return parse_games(page)
+        except ParseError as err:
+            raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err
+
+    async def fetch_standings(self, slug: str) -> dict[int, int]:
+        """Fetch a competition's league table (team id -> position).
+
+        Empty for pool/conference tables; ``RugbyPassError`` when the
+        competition has no standings page (e.g. Internationals: HTTP 404).
+        """
+        url = f"{BASE_URL}/{slug}/standings/"
+        page = await self._get(url)
+        try:
+            return parse_standings(page)
+        except ParseError as err:
+            raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err
+
+    async def _get(self, url: str) -> str:
+        """GET a page as text; any failure is a ``RugbyPassError``."""
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT):
                 async with self._session.get(
@@ -50,12 +71,8 @@ class RugbyPassClient:
                 ) as resp:
                     if resp.status != 200:
                         raise RugbyPassError(f"{url} returned HTTP {resp.status}")
-                    page = await resp.text()
+                    return await resp.text()
         except TimeoutError as err:
             raise RugbyPassError(f"Timed out fetching {url}") from err
         except aiohttp.ClientError as err:
             raise RugbyPassError(f"Error fetching {url}: {err}") from err
-        try:
-            return parse_games(page)
-        except ParseError as err:
-            raise RugbyPassError(f"Unexpected page format at {url}: {err}") from err

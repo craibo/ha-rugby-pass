@@ -16,7 +16,15 @@ from custom_components.rugbypass.const import USER_AGENT
 from custom_components.rugbypass.source import GameSource
 
 FIXTURE = Path(__file__).parent / "fixtures" / "urc_fixtures.html"
+STANDINGS = Path(__file__).parent / "fixtures" / "urc_standings.html"
+STANDINGS_URL = "https://www.rugbypass.com/united-rugby-championship/standings/"
 URL = "https://www.rugbypass.com/united-rugby-championship/fixtures-results/"
+
+
+@pytest.fixture(autouse=True)
+def no_standings():
+    """Override the conftest stub: these tests exercise the real fetch."""
+    yield
 
 
 @pytest.fixture(name="mocked")
@@ -96,3 +104,37 @@ def test_competitions_slugs():
         "super-rugby",
         "internationals",
     }
+
+
+# --- standings ------------------------------------------------------------------
+
+
+async def test_fetch_standings_returns_positions(mocked):
+    mocked.get(STANDINGS_URL, status=200, body=STANDINGS.read_text(encoding="utf-8"))
+    async with aiohttp.ClientSession() as session:
+        table = await RugbyPassClient(session).fetch_standings(
+            "united-rugby-championship"
+        )
+    assert len(table) == 16
+    assert table[3098] == 1
+    (call,) = next(iter(mocked.requests.values()))
+    assert call.kwargs["headers"]["User-Agent"] == USER_AGENT
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"status": 404, "body": "<html>Not found</html>"},
+        {"status": 500},
+        {"exception": asyncio.TimeoutError()},
+        {"exception": aiohttp.ClientConnectionError("boom")},
+        {"status": 200, "body": "<html>nothing here</html>"},
+    ],
+)
+async def test_fetch_standings_errors_raise(mocked, kwargs):
+    mocked.get(STANDINGS_URL, **kwargs)
+    async with aiohttp.ClientSession() as session:
+        with pytest.raises(RugbyPassError) as info:
+            await RugbyPassClient(session).fetch_standings("united-rugby-championship")
+    if "exception" in kwargs or kwargs.get("status") == 200:
+        assert info.value.__cause__ is not None
