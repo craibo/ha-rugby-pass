@@ -74,6 +74,7 @@ var D=globalThis,z=D.ShadowRoot&&(D.ShadyCSS===void 0||D.ShadyCSS.nativeShadow)&
     }
     .centre {
       flex: 1;
+      min-width: 0;
       text-align: center;
     }
     .headline {
@@ -90,6 +91,8 @@ var D=globalThis,z=D.ShadowRoot&&(D.ShadyCSS===void 0||D.ShadyCSS.nativeShadow)&
       white-space: nowrap;
     }
     .venue {
+      min-width: 0;
+      max-width: 100%;
       font-size: 0.85em;
       color: var(--secondary-text-color);
       white-space: nowrap;

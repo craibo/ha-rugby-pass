@@ -76,6 +76,7 @@ export const gameBlockStyles = css`
     }
     .centre {
       flex: 1;
+      min-width: 0;
       text-align: center;
     }
     .headline {
@@ -92,6 +93,8 @@ export const gameBlockStyles = css`
       white-space: nowrap;
     }
     .venue {
+      min-width: 0;
+      max-width: 100%;
       font-size: 0.85em;
       color: var(--secondary-text-color);
       white-space: nowrap;
