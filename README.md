@@ -158,19 +158,6 @@ One page is fetched per selected competition, however many teams you follow, and
 
 Ranks add, at most once an hour (the first on start-up) and whatever the polling interval, one standings request per selected league competition, plus one request for the world rankings page when the Rugby World Cup, Nations Championship or Internationals is selected (however many of them). These requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed rank request never affects the entities or the polling: the last known ranks are kept and the request is retried after 10 minutes.
 
-## Upgrading from the old name (versions before 0.5.0)
-
-The project was previously published as `ha-rugby-pass`. From version 0.5.0 the integration domain changed from `rugbypass` to `rugby_team_tracker`, so Home Assistant treats it as a new integration and nothing migrates automatically. Follow these steps in order:
-
-1. **Read first:** do not just press Update on the old HACS entry. That can leave both the old `rugbypass` and the new `rugby_team_tracker` folders installed, giving duplicate sensors and an old card resource.
-2. In **Settings > Devices & services**, remove the old integration entry. History recorded under the old entities is not carried over; entity IDs (for example `sensor.leinster_next_game`) are normally the same because they derive from the device and entity names, so the new entities pick up the same names but start with fresh history. Check any automations that reference the removed devices.
-3. Then in HACS remove the old repository entry (`craibo/ha-rugby-pass`), or, if you installed it manually, delete the `custom_components/rugbypass` folder.
-4. Restart Home Assistant.
-5. In HACS add `https://github.com/craibo/ha-rugby-team-tracker` as a custom repository of type **Integration** (or follow the redirect once the repository has been renamed), download **Rugby Team Tracker**, and restart again.
-6. Add the **Rugby Team Tracker** integration and re-select your competitions and teams.
-7. Change dashboard cards from `custom:rugbypass-game-card` / `custom:rugbypass-team-card` to `custom:rugby-tracker-game-card` / `custom:rugby-tracker-team-card`. The old card resource disappears when the old integration is removed, so old cards show an error until changed.
-8. Hard-refresh the browser (Ctrl+F5 or Cmd+Shift+R) so the new card bundle loads.
-
 ## Known limitations
 
 - The data source has no period field, so the period is derived from the minute: First Half up to minute 40, Second Half after. The half-time boundary is a guess.
