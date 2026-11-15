@@ -178,7 +178,7 @@ describe("buildView ranks", () => {
 const GOOD = "https://www.rugbypass.com/live/a-vs-b/?g=1";
 
 describe("safeMatchUrl", () => {
-  it("accepts rugbypass https urls and normalises", () => {
+  it("accepts source-site https urls and normalises", () => {
     expect(safeMatchUrl(GOOD)).toBe(GOOD);
     expect(safeMatchUrl("https://rugbypass.com/live/x/")).toBe("https://rugbypass.com/live/x/");
     expect(safeMatchUrl("https://WWW.RugbyPass.com")).toBe("https://www.rugbypass.com/");
@@ -225,5 +225,5 @@ describe("buildView matchUrl and venue", () => {
 });
 
 it("matchLinkLabel names both teams", () => {
-  expect(matchLinkLabel("Scotland", "Wales")).toBe("Open the match on RugbyPass: Scotland v Wales");
+  expect(matchLinkLabel("Scotland", "Wales")).toBe("Open the match on the website: Scotland v Wales");
 });

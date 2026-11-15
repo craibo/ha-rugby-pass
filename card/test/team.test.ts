@@ -184,7 +184,7 @@ describe("buildTeamView previous", () => {
 
 describe("validateTeamConfig", () => {
   it("errors when none of the keys is present", () => {
-    expect(() => validateTeamConfig({} as never)).toThrow(/rugbypass-team-card/);
+    expect(() => validateTeamConfig({} as never)).toThrow(/rugby-tracker-team-card/);
     expect(() => validateTeamConfig({ title: "x" } as never)).toThrow();
     expect(() => validateTeamConfig(undefined as never)).toThrow();
   });
@@ -255,18 +255,18 @@ describe("teamCardSize", () => {
 });
 
 describe("teamStubConfig", () => {
-  it("derives from first rugbypass sensor", () => {
+  it("derives from first rugby tracker sensor", () => {
     const c = teamStubConfig({ "sensor.t": {}, "sensor.leinster_next_game": {} });
     expect(c).toMatchObject({
-      type: "custom:rugbypass-team-card",
+      type: "custom:rugby-tracker-team-card",
       current: "sensor.leinster_current_game",
       next: "sensor.leinster_next_game",
     });
     expect(c.previous).toHaveLength(5);
   });
   it("falls back to empty next", () => {
-    expect(teamStubConfig({ "light.a": {} })).toEqual({ type: "custom:rugbypass-team-card", next: "" });
-    expect(teamStubConfig(undefined)).toEqual({ type: "custom:rugbypass-team-card", next: "" });
+    expect(teamStubConfig({ "light.a": {} })).toEqual({ type: "custom:rugby-tracker-team-card", next: "" });
+    expect(teamStubConfig(undefined)).toEqual({ type: "custom:rugby-tracker-team-card", next: "" });
   });
   it("stub validates", () => {
     expect(() => validateTeamConfig(teamStubConfig(undefined))).not.toThrow();
@@ -275,9 +275,9 @@ describe("teamStubConfig", () => {
 
 describe("buildEditorConfig", () => {
   it("derives all entities and title", () => {
-    const c = buildEditorConfig("sensor.x_next_game", "X", "custom:rugbypass-team-card", undefined);
+    const c = buildEditorConfig("sensor.x_next_game", "X", "custom:rugby-tracker-team-card", undefined);
     expect(c).toEqual({
-      type: "custom:rugbypass-team-card",
+      type: "custom:rugby-tracker-team-card",
       title: "X",
       ...deriveTeamEntities("sensor.x_next_game"),
     });

@@ -4,7 +4,7 @@ import { buildEditorConfig, type TeamConfig } from "./team";
 type FormData = { entity?: string; title?: string };
 
 const SCHEMA = [
-  { name: "entity", selector: { entity: { domain: "sensor", integration: "rugbypass" } } },
+  { name: "entity", selector: { entity: { domain: "sensor", integration: "rugby_team_tracker" } } },
   { name: "title", selector: { text: {} } },
 ];
 
@@ -13,7 +13,7 @@ const LABELS: Record<string, string> = {
   title: "Title (optional)",
 };
 
-export class RugbyPassTeamCardEditor extends LitElement {
+export class RugbyTrackerTeamCardEditor extends LitElement {
   static properties = {
     _config: { state: true },
     _hass: { state: true },
@@ -65,6 +65,6 @@ export class RugbyPassTeamCardEditor extends LitElement {
   }
 }
 
-if (!customElements.get("rugbypass-team-card-editor")) {
-  customElements.define("rugbypass-team-card-editor", RugbyPassTeamCardEditor);
+if (!customElements.get("rugby-tracker-team-card-editor")) {
+  customElements.define("rugby-tracker-team-card-editor", RugbyTrackerTeamCardEditor);
 }

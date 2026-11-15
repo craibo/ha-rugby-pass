@@ -1,10 +1,10 @@
 {
-  "name": "rugbypass-game-card",
+  "name": "rugby-tracker-cards",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/rugbypass-game-card.ts --bundle --format=esm --minify --target=es2021 --outfile=../custom_components/rugbypass/www/rugbypass-game-card.js",
+    "build": "esbuild src/rugby-tracker-game-card.ts --bundle --format=esm --minify --target=es2021 --outfile=../custom_components/rugby_team_tracker/www/rugby-tracker-cards.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

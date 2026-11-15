@@ -2,7 +2,7 @@ type States = Record<string, unknown> | undefined;
 
 const GAME_SENSOR = /^sensor\..*(current|next|previous)_game/;
 
-/** First sensor that looks like a RugbyPass game sensor, or "". */
+/** First sensor that looks like a data source game sensor, or "". */
 export function pickStubEntity(states: States): string {
   if (!states) return "";
   return Object.keys(states).find((id) => GAME_SENSOR.test(id)) ?? "";
