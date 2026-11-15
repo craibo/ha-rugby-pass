@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -381,3 +382,308 @@ async def test_competition_failing_three_times_without_data_fails(hass):
         assert coord.last_update_success
         await coord.async_refresh()
         assert not coord.last_update_success
+
+
+# --- league standings ------------------------------------------------------------
+
+
+class _Clock:
+    def __init__(self, now):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def _standings_fetch(tables, calls, failing=()):
+    async def fetch(self, slug):
+        calls.append(slug)
+        if slug in failing:
+            raise RugbyPassError(f"{slug} has no standings page")
+        return dict(tables[slug])
+
+    return fetch
+
+
+async def _games(self, slug):
+    return [g(1, timedelta(days=1))]
+
+
+async def test_standings_fetched_on_first_refresh_and_rank(hass):
+    calls: list[str] = []
+    tables = {"a": {1: 3, 2: 7}, "b": {3: 1}}
+    coord = make(hass, comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls)),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    assert sorted(calls) == ["a", "b"]
+    assert coord.standings == tables
+    assert coord.rank("a", 1) == 3
+    assert coord.rank("a", 2) == 7
+    assert coord.rank("b", 3) == 1
+    assert coord.rank("a", 99) is None  # team not in the table
+    assert coord.rank("zzz", 1) is None  # competition without standings
+    assert coord.rank("", 1) is None
+
+
+async def test_standings_cached_for_an_hour(hass):
+    calls: list[str] = []
+    tables = {"a": {1: 3}}
+    clock = _Clock(NOW)
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls)),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        assert calls == ["a"]
+        clock.now = NOW + timedelta(minutes=59)
+        tables["a"] = {1: 5}
+        await coord.async_refresh()
+        assert calls == ["a"]
+        assert coord.rank("a", 1) == 3
+        clock.now = NOW + timedelta(hours=1)
+        await coord.async_refresh()
+        assert calls == ["a", "a"]
+        assert coord.rank("a", 1) == 5
+
+
+async def test_no_standings_page_not_rerequested_within_the_hour(hass):
+    # The client maps HTTP 404 (Internationals) to an empty table.
+    calls: list[str] = []
+    clock = _Clock(NOW)
+    coord = make(hass, comps=("internationals",))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient,
+            "fetch_standings",
+            _standings_fetch({"internationals": {}}, calls),
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        for minutes in (0, 1, 10, 30, 59):
+            clock.now = NOW + timedelta(minutes=minutes)
+            await coord.async_refresh()
+            assert coord.last_update_success
+        assert calls == ["internationals"]
+        assert coord.rank("internationals", 1) is None
+        clock.now = NOW + timedelta(hours=1)
+        await coord.async_refresh()
+        assert calls == ["internationals", "internationals"]
+
+
+async def test_failed_standings_retried_after_ten_minutes(hass):
+    calls: list[str] = []
+    failing = {"a"}
+    clock = _Clock(NOW)
+    tables = {"a": {1: 4}}
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls, failing)
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        assert calls == ["a"]
+        assert coord.rank("a", 1) is None
+        clock.now = NOW + timedelta(minutes=9, seconds=59)
+        await coord.async_refresh()
+        assert calls == ["a"]  # not before 10 minutes
+        failing.clear()
+        clock.now = NOW + timedelta(minutes=10)
+        await coord.async_refresh()
+        assert calls == ["a", "a"]
+        assert coord.rank("a", 1) == 4
+        # success: cached for the hour from now on
+        clock.now = NOW + timedelta(minutes=69)
+        await coord.async_refresh()
+        assert calls == ["a", "a"]
+        clock.now = NOW + timedelta(minutes=70)
+        await coord.async_refresh()
+        assert calls == ["a", "a", "a"]
+
+
+async def test_failed_standings_keep_last_good_table_until_retry_succeeds(hass):
+    calls: list[str] = []
+    failing: set[str] = set()
+    clock = _Clock(NOW)
+    tables = {"a": {1: 2}}
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient, "fetch_standings", _standings_fetch(tables, calls, failing)
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        failing.add("a")
+        tables["a"] = {1: 6}
+        clock.now = NOW + timedelta(hours=1)
+        await coord.async_refresh()
+        assert coord.rank("a", 1) == 2
+        clock.now = NOW + timedelta(hours=1, minutes=10)
+        await coord.async_refresh()
+        assert coord.rank("a", 1) == 2
+        assert len(calls) == 3
+        failing.clear()
+        clock.now = NOW + timedelta(hours=1, minutes=20)
+        await coord.async_refresh()
+        assert coord.rank("a", 1) == 6
+        assert len(calls) == 4
+
+
+async def test_unexpected_standings_exception_is_not_fatal(hass):
+    async def boom(self, slug):
+        raise ValueError("unexpected")
+
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        interval = coord.update_interval
+        with patch.object(RugbyPassClient, "fetch_standings", boom):
+            coord._standings_next.clear()  # make standings due now
+            await coord.async_refresh()
+    assert coord.last_update_success
+    assert coord.data[1].next.id == 1
+    assert coord.update_interval == interval
+    assert coord._failures == 0
+    assert coord._competition_failures == {"a": 0}
+    assert coord.rank("a", 1) is None
+
+
+async def test_hanging_standings_fetch_times_out_without_failing(hass):
+    never = asyncio.Event()
+    calls: list[str] = []
+
+    async def hang(self, slug):
+        calls.append(slug)
+        await never.wait()
+        return {1: 1}
+
+    clock = _Clock(NOW)
+    coord = make(hass, comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(RugbyPassClient, "fetch_standings", hang),
+        patch("custom_components.rugbypass.coordinator.STANDINGS_TIMEOUT", 0.05),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        await coord.async_refresh()
+        elapsed = loop.time() - start
+        assert coord.last_update_success
+        assert coord.data[1].next.id == 1
+        assert coord._failures == 0
+        assert sorted(calls) == ["a", "b"]
+        # concurrent: both time out together, not one after the other
+        assert elapsed < 0.09
+        assert coord.rank("a", 1) is None
+        # a timeout is a failed fetch: retried after 10 minutes
+        clock.now = NOW + timedelta(minutes=10)
+        await coord.async_refresh()
+        assert len(calls) == 4
+
+
+async def test_standings_fetched_after_games(hass):
+    order: list[str] = []
+
+    async def games(self, slug):
+        order.append(f"games:{slug}")
+        return [g(1, timedelta(days=1))]
+
+    async def standings(self, slug):
+        order.append(f"standings:{slug}")
+        return {}
+
+    coord = make(hass, comps=("a", "b"))
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", games),
+        patch.object(RugbyPassClient, "fetch_standings", standings),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+    assert order[:2] == ["games:a", "games:b"]
+    assert sorted(order[2:]) == ["standings:a", "standings:b"]
+
+
+async def test_standings_failure_is_never_fatal_and_keeps_last_table(hass):
+    calls: list[str] = []
+    failing: set[str] = set()
+    clock = _Clock(NOW)
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient,
+            "fetch_standings",
+            _standings_fetch({"a": {1: 2}}, calls, failing),
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", clock),
+    ):
+        await coord.async_refresh()
+        interval = coord.update_interval
+        failing.add("a")
+        for hours in range(1, 6):
+            clock.now = NOW + timedelta(hours=hours)
+            await coord.async_refresh()
+            assert coord.last_update_success
+            assert coord.update_interval == interval
+            assert coord._failures == 0
+            assert coord._competition_failures == {"a": 0}
+            assert coord.rank("a", 1) == 2  # last good table kept
+        assert len(calls) == 6
+
+
+async def test_standings_failure_on_first_refresh_is_not_fatal(hass):
+    coord = make(hass)
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", _games),
+        patch.object(
+            RugbyPassClient, "fetch_standings", _standings_fetch({}, [], failing={"a"})
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        data = await coord._async_update_data()
+    assert data[1].next.id == 1
+    assert coord.rank("a", 1) is None
+
+
+async def test_standings_not_fetched_for_failing_competition(hass):
+    calls: list[str] = []
+    coord = make(hass, comps=("a", "b"))
+    with (
+        patch.object(
+            RugbyPassClient,
+            "fetch_competition",
+            _comp_fetch({"a": [g(1, timedelta(days=1))]}, {"b"}),
+        ),
+        patch.object(
+            RugbyPassClient,
+            "fetch_standings",
+            _standings_fetch({"a": {1: 1}, "b": {3: 1}}, calls),
+        ),
+        patch("custom_components.rugbypass.coordinator.dt_util.utcnow", return_value=NOW),
+    ):
+        await coord.async_refresh()
+        assert calls == ["a"]
+        # b comes back: its standings are fetched on the next refresh.
+        with patch.object(
+            RugbyPassClient,
+            "fetch_competition",
+            _comp_fetch({"a": [], "b": []}, set()),
+        ):
+            await coord.async_refresh()
+    assert calls == ["a", "b"]
+    assert coord.rank("b", 3) == 1

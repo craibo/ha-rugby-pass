@@ -38,6 +38,9 @@ class Game:
     live: bool
     minute: int
     url: str
+    # RugbyPass competition slug (``tournamentUri``), e.g.
+    # "united-rugby-championship"; used to look up league positions.
+    competition_slug: str = ""
 
 
 def derive_period(game: Game) -> str:

@@ -7,9 +7,18 @@ import pytest
 
 from custom_components.rugbypass.const import PERIODS
 from custom_components.rugbypass.models import Game, derive_period
-from custom_components.rugbypass.source import GameSource, ParseError, parse_games
+from custom_components.rugbypass.source import (
+    GameSource,
+    ParseError,
+    parse_games,
+    parse_standings,
+)
 
-FIXTURE = Path(__file__).parent / "fixtures" / "urc_fixtures.html"
+FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURE = FIXTURES / "urc_fixtures.html"
+STANDINGS = FIXTURES / "urc_standings.html"
+POOL_STANDINGS = FIXTURES / "pool_standings.html"
+NO_STANDINGS = FIXTURES / "no_standings.html"
 
 CARDIFF_ID = 4471
 SECOND_HALF = PERIODS[2]
@@ -201,3 +210,143 @@ def test_minute_helper_direct():
     assert _minute("HT") == 0
     assert _minute(None) == 0
     assert _minute(52) == 52
+
+
+def test_competition_slug_from_tournament_uri(games):
+    assert {g.competition_slug for g in games} == {"united-rugby-championship"}
+
+
+def test_missing_tournament_uri_is_empty_slug():
+    html = _fixture_html().replace(
+        '"tournamentUri":"united-rugby-championship",', "", 1
+    )
+    slugs = [g.competition_slug for g in parse_games(html)]
+    assert slugs.count("") == 1
+
+
+# --- standings ------------------------------------------------------------------
+
+
+def _standings_html() -> str:
+    return STANDINGS.read_text(encoding="utf-8")
+
+
+def test_parse_standings_all_teams():
+    table = parse_standings(_standings_html())
+    assert len(table) == 16
+    assert table[3098] == 1  # Glasgow
+    assert table[4471] == 7  # Cardiff
+    assert table[5483] == 11  # Connacht
+    assert table[4474] == 16  # Zebre
+    assert sorted(table.values()) == list(range(1, 17))
+
+
+def test_parse_standings_pool_page_is_empty():
+    assert parse_standings(POOL_STANDINGS.read_text(encoding="utf-8")) == {}
+
+
+def test_parse_standings_groups_without_conference_flag_is_empty():
+    html = _standings_html().replace('"groups":[]', '"groups":[{"name":"Pool A"}]', 1)
+    assert parse_standings(html) == {}
+
+
+def test_parse_standings_conference_flag_is_empty():
+    html = _standings_html().replace(
+        '"standingsConference":false', '"standingsConference":true', 1
+    )
+    assert parse_standings(html) == {}
+
+
+def test_parse_standings_has_standings_false_is_empty():
+    html = _standings_html().replace('"hasStandings":true', '"hasStandings":false', 1)
+    assert parse_standings(html) == {}
+
+
+def test_parse_standings_missing_element_raises():
+    with pytest.raises(ParseError):
+        parse_standings(NO_STANDINGS.read_text(encoding="utf-8"))
+
+
+def test_parse_standings_malformed_json_raises():
+    html = '<div id="standings-data" style="display: none;">{"hasStandings":</div>'
+    with pytest.raises(ParseError):
+        parse_standings(html)
+
+
+def test_parse_standings_non_object_json_raises():
+    html = '<div id="standings-data" style="display: none;">[1, 2]</div>'
+    with pytest.raises(ParseError):
+        parse_standings(html)
+
+
+def test_parse_standings_skips_bad_entries():
+    html = (
+        _standings_html()
+        .replace('"team":{"id":3098,', '"team":{"id":"gla",', 1)
+        .replace('"position":7,', '"position":null,', 1)
+    )
+    table = parse_standings(html)
+    assert 3098 not in table
+    assert 4471 not in table
+    assert len(table) == 14
+    assert table[5586] == 2
+
+
+def test_parse_standings_html_entity_escaped():
+    html = _standings_html()
+    start = html.index(">", html.index('id="standings-data"')) + 1
+    end = html.index("</div>", start)
+    escaped = html[:start] + html[start:end].replace('"', "&quot;") + html[end:]
+    assert len(parse_standings(escaped)) == 16
+
+
+@pytest.mark.parametrize(
+    "bad_id",
+    ['"²"', '"١٢"', '"' + "9" * 5000 + '"', "9" * 20, '"1234567890"', "1.5", "true"],
+    ids=["superscript", "arabic-indic", "5000-digit-string", "20-digit-int",
+         "10-digit-string", "float", "bool"],
+)  # fmt: skip
+def test_parse_standings_skips_unusable_ids(bad_id):
+    html = _standings_html().replace('"team":{"id":3098,', f'"team":{{"id":{bad_id},', 1)
+    table = parse_standings(html)
+    assert 3098 not in table
+    assert len(table) == 15
+
+
+def test_parse_standings_accepts_digit_string_ids():
+    html = _standings_html().replace('"team":{"id":3098,', '"team":{"id":" 3098 ",', 1)
+    assert parse_standings(html)[3098] == 1
+
+
+def test_parse_standings_deeply_nested_json_raises_parse_error():
+    deep = "[" * 100_000 + "]" * 100_000
+    html = (
+        '<div id="standings-data" style="display: none;">'
+        '{"hasStandings":true,"x":' + deep + "}</div>"
+    )
+    with pytest.raises(ParseError):
+        parse_standings(html)
+
+
+@pytest.mark.parametrize("position", ["0", "-3", '"0"'], ids=["zero", "negative", "zero-str"])
+def test_parse_standings_drops_positions_below_one(position):
+    html = _standings_html().replace('"position":7,', f'"position":{position},', 1)
+    table = parse_standings(html)
+    assert 4471 not in table
+    assert len(table) == 15
+
+
+def test_parse_standings_duplicate_team_keeps_first():
+    # Make Zebre (16th) a second Glasgow entry: the first (1st) wins.
+    html = _standings_html().replace('"team":{"id":4474,', '"team":{"id":3098,', 1)
+    table = parse_standings(html)
+    assert table[3098] == 1
+    assert len(table) == 15
+
+
+def test_parse_standings_huge_raw_int_raises_parse_error():
+    # Python refuses to decode ints over 4300 digits (ValueError): the page
+    # is unusable, which must surface as ParseError, never ValueError.
+    html = _standings_html().replace('"team":{"id":3098,', '"team":{"id":' + "9" * 5000 + ",", 1)
+    with pytest.raises(ParseError):
+        parse_standings(html)

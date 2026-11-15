@@ -11,7 +11,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rugbypass.client import RugbyPassClient
+from custom_components.rugbypass.client import RugbyPassClient, RugbyPassError
 from custom_components.rugbypass.const import DOMAIN
 from custom_components.rugbypass.sensor import game_attributes
 
@@ -20,6 +20,7 @@ from .test_coordinator import NOW, T1, T2, T3, g
 ATTR_KEYS = {
     "opposition", "home_away", "kickoff", "venue", "home_team", "away_team",
     "home_score", "away_score", "period", "minute", "status", "match_url", "logos",
+    "home_rank", "away_rank",
 }  # fmt: skip
 
 
@@ -40,9 +41,14 @@ def result(gid, days, hs, as_, **kw):
     )
 
 
-async def setup(hass, games, teams=(1,), names=None):
+async def setup(hass, games, teams=(1,), names=None, standings=None):
     async def fetch(self, slug):
         return games
+
+    async def fetch_standings(self, slug):
+        if standings is None or slug not in standings:
+            raise RugbyPassError(f"{slug}: no standings page")
+        return standings[slug]
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -53,7 +59,10 @@ async def setup(hass, games, teams=(1,), names=None):
         },
     )
     entry.add_to_hass(hass)
-    with patch.object(RugbyPassClient, "fetch_competition", fetch):
+    with (
+        patch.object(RugbyPassClient, "fetch_competition", fetch),
+        patch.object(RugbyPassClient, "fetch_standings", fetch_standings),
+    ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry
@@ -197,3 +206,60 @@ def test_game_attributes_home_and_away():
     assert home["logos"] == {"home": "", "away": ""}
     assert home["venue"] == "Ground"
     assert game_attributes(replace(game, url="https://x/y"), 1)["match_url"] == "https://x/y"
+
+    assert home["home_rank"] is None and home["away_rank"] is None
+
+
+def test_game_attributes_ranks_from_lookup():
+    game = replace(g(1, timedelta(days=1), home=T1, away=T2), competition_slug="c")
+    table = {("c", 1): 4, ("c", 2): 11}
+
+    def ranks(slug, team_id):
+        return table.get((slug, team_id))
+
+    home = game_attributes(game, 1, ranks)
+    away = game_attributes(game, 2, ranks)
+    assert set(home) == ATTR_KEYS
+    assert home["home_rank"] == 4 and home["away_rank"] == 11
+    # Ranks belong to home/away, not to the viewing team.
+    assert away["home_rank"] == 4 and away["away_rank"] == 11
+    other = replace(game, away=T3)
+    assert game_attributes(other, 1, ranks)["away_rank"] is None
+
+
+def ranked(game):
+    return replace(game, competition_slug="c")
+
+
+async def test_sensor_ranks_from_standings(hass):
+    games = [
+        ranked(g(1, timedelta(days=1), home=T1, away=T2)),
+        ranked(result(2, 1, 24, 17, home=T3, away=T1)),
+    ]
+    await setup(hass, games, standings={"c": {1: 3, 2: 1, 3: 12}})
+    nxt = state(hass, "one_next_game").attributes
+    assert nxt["home_rank"] == 3 and nxt["away_rank"] == 1
+    prev = state(hass, "one_previous_game_1").attributes
+    assert prev["home_rank"] == 12 and prev["away_rank"] == 3
+
+
+async def test_sensor_ranks_none_without_standings(hass):
+    await setup(hass, [ranked(g(1, timedelta(days=1)))])
+    s = state(hass, "one_next_game")
+    assert s.state == (NOW + timedelta(days=1)).isoformat()
+    assert s.attributes["opposition"] == "Two"
+    assert s.attributes["home_rank"] is None and s.attributes["away_rank"] is None
+
+
+async def test_sensor_rank_none_for_team_not_in_table(hass):
+    await setup(hass, [ranked(g(1, timedelta(days=1)))], standings={"c": {1: 2}})
+    attrs = state(hass, "one_next_game").attributes
+    assert attrs["home_rank"] == 2 and attrs["away_rank"] is None
+
+
+async def test_pool_competition_games_have_no_ranks(hass):
+    # A pool-based standings page parses to {} (see test_client): no ranks.
+    await setup(hass, [ranked(g(1, timedelta(days=1)))], standings={"c": {}})
+    attrs = state(hass, "one_next_game").attributes
+    assert attrs["opposition"] == "Two"
+    assert attrs["home_rank"] is None and attrs["away_rank"] is None

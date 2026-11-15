@@ -1,5 +1,13 @@
 export type HassEntity = { state: string; attributes: Record<string, unknown> };
-export type TeamView = { name: string; logo?: string; score?: number };
+export type TeamView = {
+  name: string;
+  logo?: string;
+  score?: number;
+  /** League-table position (from RugbyPass standings), if known. */
+  rank?: number;
+  /** `rank` formatted for the locale, e.g. "3rd" or "#3". */
+  rankLabel?: string;
+};
 export type CardView = {
   mode: "upcoming" | "live" | "final" | "empty";
   home: TeamView;
@@ -23,6 +31,30 @@ const str = (v: unknown): string | undefined =>
   typeof v === "string" && v !== "" ? v : undefined;
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
+
+const ORDINAL_SUFFIX: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
+
+/** A positive integer league position, else undefined. */
+export const rankOf = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isInteger(v) && v > 0 ? v : undefined;
+
+/** League position as text: English ordinals ("1st", "12th") or "#n" for other locales. */
+export function formatRank(rank: number, locale: string): string {
+  if (typeof locale !== "string" || !/^en(?:$|[-_])/i.test(locale)) return `#${rank}`;
+  let rules: Intl.PluralRules;
+  try {
+    rules = new Intl.PluralRules(locale, { type: "ordinal" });
+  } catch {
+    rules = new Intl.PluralRules("en", { type: "ordinal" });
+  }
+  return `${rank}${ORDINAL_SUFFIX[rules.select(rank)] ?? "th"}`;
+}
+
+/** `{rank, rankLabel}` for a raw attribute value; empty when not a valid rank. */
+export function rankFields(raw: unknown, locale: string): { rank?: number; rankLabel?: string } {
+  const rank = rankOf(raw);
+  return rank === undefined ? {} : { rank, rankLabel: formatRank(rank, locale) };
+}
 
 function formatKickoff(
   raw: unknown,
@@ -70,8 +102,18 @@ export function buildView(
       a.logos && typeof a.logos === "object" ? (a.logos as Record<string, unknown>) : {};
     const hs = num(a.home_score);
     const as = num(a.away_score);
-    const home: TeamView = { name: homeName, logo: str(logos.home), score: hs };
-    const away: TeamView = { name: awayName, logo: str(logos.away), score: as };
+    const home: TeamView = {
+      name: homeName,
+      logo: str(logos.home),
+      score: hs,
+      ...rankFields(a.home_rank, locale),
+    };
+    const away: TeamView = {
+      name: awayName,
+      logo: str(logos.away),
+      score: as,
+      ...rankFields(a.away_rank, locale),
+    };
     const score = `${hs ?? "-"} – ${as ?? "-"}`;
 
     switch (period) {

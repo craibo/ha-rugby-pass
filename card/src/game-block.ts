@@ -4,7 +4,9 @@ import type { CardView, TeamView } from "./state";
 function team(t: TeamView): TemplateResult {
   return html`<div class="team">
     ${t.logo ? html`<img class="logo" src=${t.logo} alt="" />` : html`<div class="logo"></div>`}
-    <div class="name">${t.name}</div>
+    <div class="name">
+      ${t.name}${t.rankLabel ? html` <span class="rank">${t.rankLabel}</span>` : nothing}
+    </div>
   </div>`;
 }
 
@@ -53,6 +55,14 @@ export const gameBlockStyles = css`
     .name {
       margin-top: 6px;
       font-weight: 500;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .rank {
+      font-size: 0.8em;
+      font-weight: 400;
+      color: var(--secondary-text-color);
+      white-space: nowrap;
     }
     .centre {
       flex: 1;

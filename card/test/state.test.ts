@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildView, type HassEntity } from "../src/state";
+import { buildView, formatRank, type HassEntity } from "../src/state";
 
 const base = {
   opposition: "Wallabies",
@@ -110,5 +110,67 @@ describe("buildView", () => {
     expect(v.home.logo).toBe("https://l/sco.png");
     expect(v.away.logo).toBe("https://l/aus.png");
     expect(buildView(ent({ logos: { home: null } }), "en", "UTC").home.logo).toBeUndefined();
+  });
+});
+
+describe("formatRank", () => {
+  it("uses English ordinals for en locales", () => {
+    const cases: [number, string][] = [
+      [1, "1st"], [2, "2nd"], [3, "3rd"], [4, "4th"], [10, "10th"],
+      [11, "11th"], [12, "12th"], [13, "13th"], [14, "14th"],
+      [21, "21st"], [22, "22nd"], [23, "23rd"], [24, "24th"],
+      [101, "101st"], [111, "111th"], [112, "112th"],
+    ];
+    for (const [n, want] of cases) {
+      expect(formatRank(n, "en")).toBe(want);
+      expect(formatRank(n, "en-GB")).toBe(want);
+      expect(formatRank(n, "en-AU")).toBe(want);
+    }
+  });
+  it("falls back to #n for other locales", () => {
+    expect(formatRank(1, "fr")).toBe("#1");
+    expect(formatRank(3, "de-DE")).toBe("#3");
+    expect(formatRank(12, "nl")).toBe("#12");
+    expect(formatRank(2, "")).toBe("#2");
+  });
+  it("never throws on odd locales", () => {
+    expect(() => formatRank(2, "en-!!bad")).not.toThrow();
+    expect(formatRank(2, "en-!!bad")).toBe("2nd");
+  });
+});
+
+describe("buildView ranks", () => {
+  it("reads home_rank and away_rank", () => {
+    const v = buildView(ent({ home_rank: 3, away_rank: 11 }), "en", "UTC");
+    expect(v.home.rank).toBe(3);
+    expect(v.away.rank).toBe(11);
+    expect(v.home.rankLabel).toBe("3rd");
+    expect(v.away.rankLabel).toBe("11th");
+  });
+  it("labels use the locale", () => {
+    const v = buildView(ent({ home_rank: 1, away_rank: 2 }), "fr", "UTC");
+    expect(v.home.rankLabel).toBe("#1");
+    expect(v.away.rankLabel).toBe("#2");
+  });
+  it("ranks in live and final views too", () => {
+    const live = buildView(
+      ent({ period: "First Half", minute: 5, home_score: 0, away_score: 0, home_rank: 5, away_rank: 6 }),
+      "en",
+      "UTC",
+    );
+    expect([live.home.rankLabel, live.away.rankLabel]).toEqual(["5th", "6th"]);
+    const fin = buildView(ent({ period: "Result", home_score: 1, away_score: 0, away_rank: 2 }), "en", "UTC");
+    expect(fin.home.rank).toBeUndefined();
+    expect(fin.away.rankLabel).toBe("2nd");
+  });
+  it("ignores missing or invalid rank types", () => {
+    for (const bad of [undefined, null, "3", 0, -1, 2.5, NaN, Infinity, true, {}, [1]]) {
+      const v = buildView(ent({ home_rank: bad, away_rank: bad }), "en", "UTC");
+      expect(v.mode).toBe("upcoming");
+      expect(v.home.rank).toBeUndefined();
+      expect(v.home.rankLabel).toBeUndefined();
+      expect(v.away.rank).toBeUndefined();
+      expect(v.away.rankLabel).toBeUndefined();
+    }
   });
 });

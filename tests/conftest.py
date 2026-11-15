@@ -23,3 +23,13 @@ def frontend(hass):
         patch("custom_components.rugbypass.add_extra_js_url") as add_js,
     ):
         yield register, add_js
+
+
+@pytest.fixture(autouse=True)
+def no_standings():
+    """Stub standings fetches (no league table) unless a test patches them."""
+    with patch(
+        "custom_components.rugbypass.client.RugbyPassClient.fetch_standings",
+        AsyncMock(return_value={}),
+    ) as fetch:
+        yield fetch

@@ -19,6 +19,11 @@ from .models import Game, Team
 # teams (only id/epoch/round/venue "TBD"); it is deliberately not read, as
 # those are not followable games until RugbyPass moves them into game-days.
 GAME_DAYS_MARKER = 'id="current-game-days"'
+# Standings pages embed the league table the same way:
+#   <div id="standings-data" style="display: none;">{...}</div>
+# {"hasStandings", "standingsConference",
+#  "standingsData": {"groups": [...], "standings": [{"team": {"id"}, "position"}]}}
+STANDINGS_MARKER = 'id="standings-data"'
 
 _DECODER = json.JSONDecoder()
 _LEADING_DIGITS = re.compile(r"\d+")
@@ -58,29 +63,104 @@ def parse_games(page: str) -> list[Game]:
 
 def _extract_game_days(page: str) -> list[Any]:
     """Locate and decode the inline JSON array of game days."""
-    marker = page.find(GAME_DAYS_MARKER)
+    return _extract_inline_json(page, GAME_DAYS_MARKER, list, "game data")
+
+
+def _extract_inline_json(
+    page: str, marker_text: str, expected: type, label: str
+) -> Any:
+    """Locate and decode inline JSON in a hidden element.
+
+    Raw JSON is decoded in place (bracket-aware, stops at the value's end);
+    an HTML-entity-escaped variant of the element text is the fallback.
+    """
+    marker = page.find(marker_text)
     if marker == -1:
-        raise ParseError("No inline game data found")
+        raise ParseError(f"No inline {label} found")
     tag_end = page.find(">", marker)
     if tag_end == -1:
-        raise ParseError("Malformed game data element")
+        raise ParseError(f"Malformed {label} element")
     start = tag_end + 1
     end = page.find("</div>", start)
     element_text = page[start:end] if end != -1 else page[start:]
-    # Raw JSON is decoded in place (bracket-aware, stops at the array's end);
-    # an HTML-entity-escaped variant of the element text is the fallback.
-    decoded_non_list = False
+    decoded_wrong_type = False
     for text in (page[start:], html_lib.unescape(element_text)):
         try:
             data, _ = _DECODER.raw_decode(text.lstrip())
         except json.JSONDecodeError:
             continue
-        if isinstance(data, list):
+        if isinstance(data, expected):
             return data
-        decoded_non_list = True
-    if decoded_non_list:
-        raise ParseError("Inline game data is not a JSON array")
-    raise ParseError("Inline game data is malformed or truncated JSON")
+        decoded_wrong_type = True
+    if decoded_wrong_type:
+        kind = "array" if expected is list else "object"
+        raise ParseError(f"Inline {label} is not a JSON {kind}")
+    raise ParseError(f"Inline {label} is malformed or truncated JSON")
+
+
+def parse_standings(page: str) -> dict[int, int]:
+    """Parse a RugbyPass standings page into team id -> league position.
+
+    Only a single league table is used: pool or conference pages (such as
+    the World Cup) give positions within a pool, which would read as league
+    positions, so they yield an empty table, as does a page without
+    standings. Entries without a usable team id and position (>= 1) are
+    skipped; for a repeated team the first entry wins.
+    """
+    try:
+        return _parse_standings(page)
+    except ParseError:
+        raise
+    except (RecursionError, ValueError, TypeError) as err:
+        # Untrusted JSON: e.g. absurd nesting or an int too long to decode.
+        raise ParseError(f"Unusable standings data: {type(err).__name__}") from err
+
+
+def _parse_standings(page: str) -> dict[int, int]:
+    data = _extract_inline_json(page, STANDINGS_MARKER, dict, "standings data")
+    if not data.get("hasStandings") or data.get("standingsConference"):
+        return {}
+    table = data.get("standingsData")
+    if not isinstance(table, dict) or table.get("groups"):
+        return {}
+    standings = table.get("standings") or []
+    if not isinstance(standings, list):
+        return {}
+    positions: dict[int, int] = {}
+    for entry in standings:
+        if not isinstance(entry, dict):
+            continue
+        team = entry.get("team")
+        team_id = _as_int(team.get("id")) if isinstance(team, dict) else None
+        position = _as_int(entry.get("position"))
+        if team_id is None or position is None or position < 1:
+            continue
+        positions.setdefault(team_id, position)
+    return positions
+
+
+_MAX_INT_DIGITS = 9
+_INT_LIMIT = 10**_MAX_INT_DIGITS
+
+
+def _as_int(value: Any) -> int | None:
+    """A small int (or ASCII-digit string) as int; anything else is None.
+
+    Never raises: unusable values (bools, floats, non-ASCII digits such as
+    "²", absurdly long numbers) are None.
+    """
+    try:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if -_INT_LIMIT < value < _INT_LIMIT else None
+        if isinstance(value, str):
+            text = value.strip()
+            if text.isascii() and text.isdigit() and len(text) <= _MAX_INT_DIGITS:
+                return int(text)
+    except (TypeError, ValueError):
+        pass
+    return None
 
 
 def _iter_raw_games(days: list[Any]) -> Iterator[dict[str, Any]]:
@@ -172,6 +252,7 @@ def _to_game(raw: dict[str, Any]) -> Game | None:
         away_score=_score(raw.get("awayScore")) if has_scores else None,
         venue=raw.get("venue") or None,
         competition=str(raw.get("tournamentTitle") or ""),
+        competition_slug=str(raw.get("tournamentUri") or ""),
         status=status,
         live=live,
         minute=_minute(raw.get("minute")),

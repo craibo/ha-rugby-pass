@@ -83,7 +83,13 @@ export class RugbyPassTeamCard extends LitElement {
             ${v.previous.map(
               (r) => html`<li class="prev-row">
                 <span class="date">${r.date}</span>
-                <span class="opp">${r.venue === "home" ? "vs" : "at"} ${r.opposition}</span>
+                <span class="opp"
+                  >${r.opposition}${r.rankLabel
+                    ? html` <span class="rank">${r.rankLabel}</span>`
+                    : nothing}${r.location
+                    ? html` <span class="loc">(${r.location})</span>`
+                    : nothing}</span
+                >
                 <span class="score ${r.outcome}">${r.score}</span>
               </li>`,
             )}
@@ -127,6 +133,13 @@ export class RugbyPassTeamCard extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .loc,
+      .prev-row .rank {
+        color: var(--secondary-text-color);
+      }
+      .prev-row .rank {
+        font-size: inherit;
       }
       .score {
         flex: 0 0 auto;
