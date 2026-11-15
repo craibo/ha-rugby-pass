@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RugbyPass",
+        "description": "Choose the competitions to follow.",
+        "data": {
+          "competitions": "Competitions"
+        }
+      },
+      "teams": {
+        "title": "Teams",
+        "description": "Choose the teams to follow.",
+        "data": {
+          "teams": "Teams"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to RugbyPass.",
+      "no_teams": "No teams were found for the selected competitions."
+    },
+    "abort": {
+      "already_configured": "RugbyPass is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Teams",
+        "description": "Choose the teams to follow.",
+        "data": {
+          "teams": "Teams"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to RugbyPass.",
+      "no_teams": "No teams were found for the selected competitions."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_game": {
+        "name": "Current game"
+      },
+      "next_game": {
+        "name": "Next game"
+      },
+      "previous_game_1": {
+        "name": "Previous game 1"
+      },
+      "previous_game_2": {
+        "name": "Previous game 2"
+      },
+      "previous_game_3": {
+        "name": "Previous game 3"
+      },
+      "previous_game_4": {
+        "name": "Previous game 4"
+      },
+      "previous_game_5": {
+        "name": "Previous game 5"
+      }
+    }
+  }
+}

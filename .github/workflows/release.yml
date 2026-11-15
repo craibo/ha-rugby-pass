@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match manifest version
+        run: |
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/rugbypass/manifest.json'))['version'])")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$manifest" != "$tag" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match manifest version ${manifest}" >&2
+            exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements_test.txt
+      - run: pytest -v
+      - name: Zip the integration
+        working-directory: custom_components/rugbypass
+        run: zip -r ../../rugbypass.zip . -x "__pycache__/*" "*.pyc"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: rugbypass.zip
+          generate_release_notes: true

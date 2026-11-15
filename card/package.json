@@ -1,0 +1,17 @@
+{
+  "name": "rugbypass-game-card",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/rugbypass-game-card.ts --bundle --format=esm --minify --target=es2021 --outfile=../custom_components/rugbypass/www/rugbypass-game-card.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "lit": "3.3.3",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements_test.txt
+      - run: pytest -v
+
+  card:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: card/package-lock.json
+      - name: Install, typecheck, test, build
+        working-directory: card
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Committed bundle is up to date
+        run: git diff --exit-code custom_components/rugbypass/www
+
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Upstream recommends tracking `main` for the HACS validation action.
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand assets are not yet submitted to home-assistant/brands.
+          ignore: brands
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Upstream recommends tracking `master` for hassfest.
+      - uses: home-assistant/actions/hassfest@master
