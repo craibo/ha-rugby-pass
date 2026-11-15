@@ -102,6 +102,7 @@ def test_competitions_slugs():
         "premiership",
         "the-rugby-championship",
         "super-rugby",
+        "nations-championship",
         "internationals",
     }
 
@@ -157,3 +158,20 @@ async def test_fetch_competition_404_still_raises(mocked):
             await RugbyPassClient(session).fetch_competition(
                 "united-rugby-championship"
             )
+
+
+async def test_nations_championship_listed():
+    async with aiohttp.ClientSession() as session:
+        comps = RugbyPassClient(session).list_competitions()
+    assert len(comps) == 9
+    assert comps["nations-championship"] == "Nations Championship"
+
+
+async def test_pool_standings_page_gives_no_ranks(mocked):
+    # The Nations Championship standings page is pool-based: no ranks.
+    url = "https://www.rugbypass.com/nations-championship/standings/"
+    pool = Path(__file__).parent / "fixtures" / "pool_standings.html"
+    mocked.get(url, status=200, body=pool.read_text(encoding="utf-8"))
+    async with aiohttp.ClientSession() as session:
+        table = await RugbyPassClient(session).fetch_standings("nations-championship")
+    assert table == {}

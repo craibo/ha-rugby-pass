@@ -29,6 +29,7 @@ Requires Home Assistant 2024.11 or newer.
    - Gallagher Premiership
    - The Rugby Championship
    - Super Rugby Pacific
+   - Nations Championship
    - Internationals
 3. Pick the teams to follow (the list is built from the games in those competitions).
 4. To change teams later, open the integration and choose **Configure**.
@@ -49,7 +50,7 @@ Attributes on each (empty for Current game when nothing is live): `opposition`, 
 
 ### League positions
 
-`home_rank` and `away_rank` are each team's current position in the competition's league table, read from the RugbyPass standings page (for example `https://www.rugbypass.com/united-rugby-championship/standings/`). They are the positions as of the last standings refresh, which is at most about an hour old, not the positions at the time the match was played, so a previous result shows where the opposition sits today. They are left empty when the position is unknown: for Internationals (which have no standings page), for pool-stage tournaments such as the Rugby World Cup (pool positions would read as league positions, so they are not used), and for a team that is not in the table.
+`home_rank` and `away_rank` are each team's current position in the competition's league table, read from the RugbyPass standings page (for example `https://www.rugbypass.com/united-rugby-championship/standings/`). They are the positions as of the last standings refresh, which is at most about an hour old, not the positions at the time the match was played, so a previous result shows where the opposition sits today. They are left empty when the position is unknown: for Internationals (which have no standings page), for pool-based competitions such as the Nations Championship and the Rugby World Cup pool stage (pool positions would read as league positions, so they are not used), and for a team that is not in the table.
 
 ## Game card
 

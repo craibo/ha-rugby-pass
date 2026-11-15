@@ -255,3 +255,11 @@ async def test_sensor_rank_none_for_team_not_in_table(hass):
     await setup(hass, [ranked(g(1, timedelta(days=1)))], standings={"c": {1: 2}})
     attrs = state(hass, "one_next_game").attributes
     assert attrs["home_rank"] == 2 and attrs["away_rank"] is None
+
+
+async def test_pool_competition_games_have_no_ranks(hass):
+    # A pool-based standings page parses to {} (see test_client): no ranks.
+    await setup(hass, [ranked(g(1, timedelta(days=1)))], standings={"c": {}})
+    attrs = state(hass, "one_next_game").attributes
+    assert attrs["opposition"] == "Two"
+    assert attrs["home_rank"] is None and attrs["away_rank"] is None
