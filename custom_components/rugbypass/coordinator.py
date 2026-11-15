@@ -26,6 +26,9 @@ RETRY_INTERVAL = timedelta(minutes=5)
 MAX_RETRY_INTERVAL = timedelta(minutes=40)
 MIN_INTERVAL = timedelta(seconds=60)
 IN_PLAY_WINDOW = timedelta(hours=3)
+# League tables change at most once a match day; one request per followed
+# competition per hour is plenty (and never adds to the 60 s live polling).
+STANDINGS_INTERVAL = timedelta(hours=1)
 _NOT_IN_PLAY = ("result", "postponed", "canceled")
 
 type RugbyPassConfigEntry = ConfigEntry[RugbyPassCoordinator]
@@ -101,6 +104,29 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
         # Per competition: last good games and consecutive failures.
         self._competition_games: dict[str, list[Game]] = {}
         self._competition_failures: dict[str, int] = {}
+        # League positions per competition: slug -> team id -> position.
+        self.standings: dict[str, dict[int, int]] = {}
+        # When each competition's standings were last requested (success or
+        # not), so a missing page (Internationals) is asked for once an hour.
+        self._standings_checked: dict[str, datetime] = {}
+
+    def rank(self, competition_slug: str, team_id: int) -> int | None:
+        """League position of a team in a competition, if known."""
+        return self.standings.get(competition_slug, {}).get(team_id)
+
+    async def _refresh_standings(self, slugs: list[str], now: datetime) -> None:
+        """Fetch stale league tables; failures are never fatal."""
+        for slug in slugs:
+            checked = self._standings_checked.get(slug)
+            if checked is not None and now - checked < STANDINGS_INTERVAL:
+                continue
+            self._standings_checked[slug] = now
+            try:
+                table = await self.client.fetch_standings(slug)
+            except RugbyPassError as err:
+                _LOGGER.debug("No standings for %s, keeping the last: %s", slug, err)
+                continue
+            self.standings[slug] = table
 
     def _followed(self, games: list[Game]) -> list[Game]:
         teams = entry_teams(self.config_entry)
@@ -128,6 +154,11 @@ class RugbyPassCoordinator(DataUpdateCoordinator[dict[int, TeamGames]]):
                 self._competition_failures[slug] = 0
 
         now = dt_util.utcnow()
+        # Only for competitions that answered: a site outage is not retried
+        # here, and their tables are fetched once they are back.
+        await self._refresh_standings(
+            [s for s in competitions if s not in errors], now
+        )
         if competitions and len(errors) == len(competitions):
             self._failures += 1
             self.update_interval = retry_interval(

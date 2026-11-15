@@ -26,8 +26,16 @@ RESULT_UNAVAILABLE = "Result unavailable"
 PARALLEL_UPDATES = 0
 
 
-def game_attributes(game: Game, team_id: int) -> dict[str, Any]:
-    """Build the attribute dict for a game from a team's point of view."""
+type RankLookup = Callable[[str, int], int | None]
+
+
+def game_attributes(
+    game: Game, team_id: int, ranks: RankLookup | None = None
+) -> dict[str, Any]:
+    """Build the attribute dict for a game from a team's point of view.
+
+    ``ranks(competition_slug, team_id)`` gives league positions, if known.
+    """
     is_home = game.home.id == team_id
     opposition = game.away if is_home else game.home
     url = game.url
@@ -47,6 +55,8 @@ def game_attributes(game: Game, team_id: int) -> dict[str, Any]:
         "status": game.status,
         "match_url": url,
         "logos": {"home": game.home.logo, "away": game.away.logo},
+        "home_rank": ranks(game.competition_slug, game.home.id) if ranks else None,
+        "away_rank": ranks(game.competition_slug, game.away.id) if ranks else None,
     }
 
 
@@ -168,4 +178,4 @@ class TeamGameSensor(CoordinatorEntity[RugbyPassCoordinator], SensorEntity):
         game = self._game
         if game is None or (self._slot.key == "current" and not game.live):
             return {}
-        return game_attributes(game, self._team_id)
+        return game_attributes(game, self._team_id, self.coordinator.rank)
