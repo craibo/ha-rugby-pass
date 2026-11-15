@@ -105,3 +105,7 @@ npm run build   # writes custom_components/rugbypass/www/rugbypass-game-card.js
 ```
 
 The built bundle is committed, and CI fails if it is out of date. Release steps are in [docs/RELEASING.md](docs/RELEASING.md).
+
+## Licence
+
+Released under the [MIT License](LICENSE).
