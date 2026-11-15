@@ -47,8 +47,8 @@ def render(size):
     img.paste(bg, (0, 0), mask)
 
     # Ball layer: a pointed oval drawn upright, then rotated.
-    L = int(p(370))
-    W = int(p(270))
+    L = int(p(400))
+    W = int(p(268))
     layer_size = int(p(460))
     ball = Image.new("RGBA", (layer_size, layer_size), (0, 0, 0, 0))
     cx = cy = layer_size / 2
@@ -71,25 +71,24 @@ def render(size):
     bd.polygon(pts, fill=CREAM + (255,))
     # Outline.
     bd.line(pts + [pts[0]], fill=SEAM + (255,), width=int(p(7)), joint="curve")
-    # End seams (arcs near both tips) and centre laces.
+    # Three long seams between the two tips: a straight centre seam and two
+    # curves bowing outwards, so the ball reads as four panels.
     lw = int(p(7))
-    for sign in (-1, 1):
-        # Curved panel seam: bows towards the nearer tip.
-        arc = []
-        for j in range(41):
-            u = -1 + 2 * j / 40
-            hw = (W / 2) * 0.80 * (1 - sign * 0.0)
-            x = cx + sign * (L * 0.27 + (1 - u * u) * L * 0.05)
-            arc.append((x, cy + u * hw * (1 - (0.27 * 2) ** 2.0) ** 0.62 * 1.18))
-        bd.line(arc, fill=SEAM + (255,), width=lw, joint="curve")
-    # Laces: short spine plus cross bars.
-    bd.line([(cx - L * 0.12, cy), (cx + L * 0.12, cy)], fill=SEAM + (255,), width=lw)
-    for i in range(4):
-        x = cx + (i - 1.5) * L * 0.07
-        bd.line([(x, cy - p(22)), (x, cy + p(22))], fill=SEAM + (255,), width=int(p(9)))
+    half = L / 2
+    for bow in (-1, 0, 1):
+        seam = []
+        for j in range(81):
+            t = -1 + 2 * j / 80
+            hw = (W / 2) * (1 - abs(t) ** 2.0) ** 0.62
+            seam.append((cx + t * half * 0.97, cy + bow * hw * 0.52))
+        bd.line(seam, fill=SEAM + (255,), width=lw, joint="curve")
+    # Short stitch ticks across the centre seam.
+    for i in range(5):
+        x = cx + (i - 2) * L * 0.075
+        bd.line([(x, cy - p(11)), (x, cy + p(11))], fill=SEAM + (255,), width=int(p(5)))
     ball = ball.rotate(35, resample=Image.BICUBIC)
     # Keep the ball inside the rounded square.
-    pos = (int(s / 2 - layer_size / 2 - p(22)), int(s / 2 - layer_size / 2 + p(28)))
+    pos = (int(s / 2 - layer_size / 2 - p(30)), int(s / 2 - layer_size / 2 + p(38)))
     img.alpha_composite(ball, pos)
 
     # Tracker mark: a map pin with a ring, top right, in amber.
