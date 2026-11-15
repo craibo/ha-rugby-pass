@@ -96,8 +96,15 @@ describe("buildTeamView previous", () => {
     };
     const v = buildTeamView(states, cfg, "en", "UTC");
     expect(v.previous.map((r) => r.opposition)).toEqual(["Munster", "Ulster"]);
-    expect(v.previous[0]).toMatchObject({ score: "W 24–17", outcome: "win", venue: "home" });
-    expect(v.previous[1]).toMatchObject({ score: "L 5–50", outcome: "loss", venue: "away" });
+    expect(v.previous[0]).toMatchObject({ score: "W 24–17", outcome: "win", location: "Murrayfield" });
+    expect(v.previous[1]).toMatchObject({ score: "L 5–50", outcome: "loss", location: "Murrayfield" });
+    expect("venue" in v.previous[0]).toBe(false);
+  });
+  it("location is trimmed venue, else undefined", () => {
+    const loc = (venue: unknown) =>
+      buildTeamView({ p1: prev("W 1–0", { venue }) }, cfg, "en", "UTC").previous[0].location;
+    expect(loc("  Stade de France ")).toBe("Stade de France");
+    for (const bad of [undefined, null, "", "   ", 5, {}]) expect(loc(bad)).toBeUndefined();
   });
   it("parses draw and unavailable result", () => {
     const v = buildTeamView(

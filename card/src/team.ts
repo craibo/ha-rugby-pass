@@ -12,7 +12,7 @@ export type TeamConfig = {
 export type PreviousRow = {
   date: string;
   opposition: string;
-  venue: "home" | "away";
+  location?: string;
   score: string;
   outcome: "win" | "loss" | "draw" | "unknown";
 };
@@ -95,7 +95,7 @@ function previousRow(
     return {
       date: formatDate(a.kickoff, locale, timeZone),
       opposition,
-      venue: a.home_away === "away" ? "away" : "home",
+      location: typeof a.venue === "string" && a.venue.trim() !== "" ? a.venue.trim() : undefined,
       score: state || "Result unavailable",
       outcome,
     };
