@@ -1,0 +1,12 @@
+{
+  "entity": {
+    "sensor": {
+      "current_game": { "default": "mdi:rugby" },
+      "previous_game_1": { "default": "mdi:rugby" },
+      "previous_game_2": { "default": "mdi:rugby" },
+      "previous_game_3": { "default": "mdi:rugby" },
+      "previous_game_4": { "default": "mdi:rugby" },
+      "previous_game_5": { "default": "mdi:rugby" }
+    }
+  }
+}
