@@ -48,6 +48,32 @@ describe("buildView", () => {
     expect(v.away.score).toBe(10);
   });
 
+  it("half time is live with the score and a badge without the minute", () => {
+    const v = buildView(
+      ent({ period: "Half Time", minute: 41, home_score: 12, away_score: 5, match_url: GOOD }),
+      "en",
+      "UTC",
+    );
+    expect(v.mode).toBe("live");
+    expect(v.headline).toBe("12 – 5");
+    expect(v.badge).toBe("Half Time");
+    expect(v.home.score).toBe(12);
+    expect(v.away.score).toBe(5);
+    expect(v.matchUrl).toBe(GOOD);
+  });
+
+  it("half time stays defensive about wrong types", () => {
+    const v = buildView(
+      ent({ period: "Half Time", minute: "41", home_score: "x", away_score: null, match_url: 5 }),
+      "en",
+      "UTC",
+    );
+    expect(v.mode).toBe("live");
+    expect(v.headline).toBe("- – -");
+    expect(v.badge).toBe("Half Time");
+    expect(v.matchUrl).toBeUndefined();
+  });
+
   it("final shows score and Full time", () => {
     const v = buildView(ent({ period: "Result", home_score: 24, away_score: 17 }), "en", "UTC");
     expect(v.mode).toBe("final");

@@ -908,3 +908,13 @@ async def test_rank_source_per_competition(hass):
     assert coord.rank("pacific-nations-cup", NZL) == 2
     assert coord.rank("world-rugby-nations-cup", RSA) == 1
     assert coord.rank("", RSA) is None
+
+
+def test_interval_half_time_game_stays_live():
+    game = g(1, timedelta(minutes=-55), status="halftime", live=True)
+    assert compute_interval([game], NOW) == timedelta(seconds=60)
+
+
+def test_interval_result_game_is_not_in_play():
+    game = g(1, timedelta(minutes=-100), status="result", live=False)
+    assert compute_interval([game], NOW) == timedelta(hours=6)

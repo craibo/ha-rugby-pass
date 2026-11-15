@@ -340,3 +340,30 @@ async def test_world_rankings_failure_leaves_sensors_working(hass):
     s = state(hass, "ireland_next_game")
     assert s.state == (NOW + timedelta(days=1)).isoformat()
     assert s.attributes["home_rank"] is None and s.attributes["away_rank"] is None
+
+
+async def test_current_half_time_state_and_other_sensors_unaffected(hass):
+    from custom_components.rugby_team_tracker.source import parse_games
+
+    from pathlib import Path
+
+    page = (Path(__file__).parent / "fixtures" / "live_halftime.html").read_text(encoding="utf-8")
+    ht = parse_games(page)[0]
+    t_home, t_away = ht.home, ht.away
+    prev = replace(
+        g(2, timedelta(days=-3), status="result", home=t_home, away=t_away),
+        home_score=20,
+        away_score=10,
+    )
+    nxt = g(3, timedelta(days=2), home=t_home, away=t_away)
+    ht = replace(ht, kickoff=NOW - timedelta(minutes=55))
+    await setup(
+        hass, [ht, prev, nxt], teams=(t_home.id,), names={str(t_home.id): "Scotland"}
+    )
+    cur = state(hass, "scotland_current_game")
+    assert cur.state == "Half Time"
+    assert cur.attributes["period"] == "Half Time"
+    assert cur.attributes["minute"] == 41
+    assert cur.attributes["home_score"] == 12
+    assert state(hass, "scotland_next_game").state == (NOW + timedelta(days=2)).isoformat()
+    assert state(hass, "scotland_previous_game_1").state == "W 20–10"

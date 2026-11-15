@@ -24,7 +24,7 @@ WORLD_RANKINGS = FIXTURES / "world_rankings.html"
 NO_WORLD_RANKINGS = FIXTURES / "no_world_rankings.html"
 
 CARDIFF_ID = 4471
-SECOND_HALF = PERIODS[2]
+SECOND_HALF = PERIODS[3]
 
 
 @pytest.fixture(name="games")
@@ -480,3 +480,26 @@ def test_parse_world_rankings_duplicate_slug_keeps_first():
 def test_parse_world_rankings_html_entity_escaped():
     html = _rankings_html().replace('"', "&quot;")
     assert len(parse_world_rankings(html)) == 25
+
+
+def _live(name):
+    return by_id(parse_games((FIXTURES / f"live_{name}.html").read_text(encoding="utf-8")), 291602)
+
+
+@pytest.mark.parametrize(
+    ("name", "status", "live", "minute", "scores", "period"),
+    [
+        ("first_half", "first half", True, 31, (12, 5), PERIODS[1]),
+        ("halftime", "halftime", True, 41, (12, 5), PERIODS[2]),
+        ("second_half_start", "second half", True, 40, (12, 5), PERIODS[3]),
+        ("second_half", "second half", True, 62, (12, 5), PERIODS[3]),
+        ("result", "result", False, 80, (15, 12), PERIODS[4]),
+    ],
+)
+def test_real_live_match_fixtures(name, status, live, minute, scores, period):
+    game = _live(name)
+    assert (game.status, game.live, game.minute) == (status, live, minute)
+    assert (game.home_score, game.away_score) == scores
+    assert derive_period(game) == period
+    assert game.home.name == "Scotland"
+    assert game.away.name == "Australia"
