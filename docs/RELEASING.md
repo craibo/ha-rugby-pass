@@ -1,6 +1,6 @@
 # Releasing and verifying
 
-> **Status as of this commit (delete once released):** v0.1.0 has NOT been tagged or released, `release.yml` has never run, and nothing has been installed on a Home Assistant instance yet. The steps below are still to do.
+> **Status:** releases v0.1.0 to v0.3.1 have been published through this process and `release.yml` works. The live-game checks below have still not been done against a real match.
 
 Releases are cut by pushing a `v*` tag; `.github/workflows/release.yml` checks the tag against the manifest version, runs the tests and publishes a GitHub release containing `rugbypass.zip` (the contents of `custom_components/rugbypass`).
 
@@ -9,10 +9,10 @@ The `rugbypass.zip` asset is a convenience download only. HACS installs from the
 ## Steps
 
 1. Make sure `main` is green (CI: tests, card, hacs, hassfest).
-2. Check `custom_components/rugbypass/manifest.json` `version` matches the tag you are about to create (currently `0.1.0`); bump it first if not.
-3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
+2. Check `custom_components/rugbypass/manifest.json` `version` matches the tag you are about to create ; bump it first if not (do this in a PR, and wait for CI to pass before tagging).
+3. Tag the merged `main` commit and push the tag, for example: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
 4. Confirm the Release workflow succeeded and the release has `rugbypass.zip`.
-5. In Home Assistant, HACS > Custom repositories > add `https://github.com/craibo/ha-rugby-pass` as type Integration, download it, restart HA, then add the RugbyPass integration.
+5. In Home Assistant, update (or first install) the integration through HACS, restart HA, hard-refresh the browser, then check the integration and cards. For a first install add `https://github.com/craibo/ha-rugby-pass` as a custom repository of type Integration.
 
 ## Live verification (not yet done)
 

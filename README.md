@@ -1,22 +1,56 @@
 # RugbyPass for Home Assistant
 
+[![GitHub Release][releases-shield]][releases]
+[![Downloads][downloads-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![License][license-shield]](LICENSE)
+[![hacs][hacsbadge]][hacs]
+[![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&style=for-the-badge&logo=home-assistant&label=usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.rugbypass.total)](https://analytics.home-assistant.io/)
+
 An **unofficial** Home Assistant integration that follows rugby teams using the public [RugbyPass](https://www.rugbypass.com) fixtures and results pages. It gives each team a device with its current, next and previous five games, plus two bundled Lovelace cards: a game card and a team card.
+
+---
+
+## Support this project
+
+[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor-craibo%20on%20GitHub-blue.svg?logo=github)](https://github.com/sponsors/craibo)
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg?logo=paypal)](https://paypal.me/craibo?country.x=AU&locale.x=en_AU)
+
+---
+
+## Features
+
+- **Follow your teams**: pick competitions, then the teams you care about; each team becomes a Home Assistant device
+- **Current, next and previous five games**: opposition, kick-off date and time, venue, score and period (Kick off, First Half, Second Half, Result)
+- **League positions and world rankings**: shown after team names (league table for league competitions, World Rugby men's ranking for the Rugby World Cup, Nations Championship and Internationals)
+- **Two bundled Lovelace cards**: a game card and a team card (current or next game plus the previous five results), with visual editors and no separate download
+- **Light on RugbyPass**: adaptive polling, from every 60 seconds while a followed game is live to every 6 hours when nothing is on (see [Polling and data usage](#polling-and-data-usage))
+- **UI-first setup**: everything is configured from Home Assistant; no YAML needed
 
 > **Disclaimer:** This project is not affiliated with, endorsed by or connected to RugbyPass. RugbyPass has no public API, so the integration reads the same public fixture pages a browser would. It may break at any time if the site changes. Please check RugbyPass's terms of use before using it.
 
-Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. The 6-hour idle interval is shortened so the integration wakes no later than 2 hours before the next kick-off. A followed game that is past kick-off but not yet flagged live by RugbyPass is also polled every 60 seconds, for up to 3 hours after kick-off, so the start of a match is not missed.
-
-One page is fetched per selected competition, however many teams you follow, and each competition is handled separately: if one page fails, that competition keeps its last known games while the others still update. When every page fails, the integration retries every 5 minutes; entities go unavailable only after 3 consecutive failures, and after that the retry delay doubles (10, 20, then 40 minutes), never waiting longer than the normal polling interval. The normal interval returns as soon as a fetch succeeds.
-
-Ranks add, at most once an hour (the first on start-up) and whatever the polling interval, one standings request per selected league competition, plus one request for the world rankings page when the Rugby World Cup, Nations Championship or Internationals is selected (however many of them). These requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed rank request never affects the entities or the polling: the last known ranks are kept and the request is retried after 10 minutes.
+## Quick Start
 
 Requires Home Assistant 2024.11 or newer.
 
-## Install (HACS custom repository)
+### Installation via HACS (Recommended)
 
-1. In HACS, open the menu > **Custom repositories**.
-2. Add `https://github.com/craibo/ha-rugby-pass` with type **Integration**.
-3. Download **RugbyPass** and restart Home Assistant.
+1. Install [HACS](https://hacs.xyz/docs/use/) if you have not already.
+2. [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=craibo&repository=ha-rugby-pass&category=integration)
+   (or in HACS open the menu > **Custom repositories**, add `https://github.com/craibo/ha-rugby-pass` with type **Integration**)
+3. Press the **Download** button.
+4. Restart Home Assistant.
+5. [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=rugbypass)
+
+### Manual installation
+
+1. Download `rugbypass.zip` from the [latest release][releases], or copy the `custom_components/rugbypass` folder from this repository.
+2. Put the `rugbypass` folder in your Home Assistant `custom_components` directory.
+3. Restart Home Assistant.
+
+### Updating
+
+HACS shows a new version when a [release][releases] is published. Update it there, restart Home Assistant, then hard-refresh your browser (Ctrl+Shift+R) so the cards load the new version. Each release's notes are on the [releases page][releases].
 
 ## Setup
 
@@ -112,6 +146,14 @@ At least one of `next`, `current` or a non-empty `previous` is required; entries
 
 **Visual editor:** pick any one of the team's game sensors and the editor fills in the other six from the entity-id naming (`..._current_game`, `..._next_game`, `..._previous_game_1` to `5`). If you have renamed the entities so they no longer follow that pattern, set the entity ids explicitly in YAML as above. If the sensor you pick does not follow the naming pattern, the editor sets only `next`; add `current` and `previous` in YAML.
 
+## Polling and data usage
+
+Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. The 6-hour idle interval is shortened so the integration wakes no later than 2 hours before the next kick-off. A followed game that is past kick-off but not yet flagged live by RugbyPass is also polled every 60 seconds, for up to 3 hours after kick-off, so the start of a match is not missed.
+
+One page is fetched per selected competition, however many teams you follow, and each competition is handled separately: if one page fails, that competition keeps its last known games while the others still update. When every page fails, the integration retries every 5 minutes; entities go unavailable only after 3 consecutive failures, and after that the retry delay doubles (10, 20, then 40 minutes), never waiting longer than the normal polling interval. The normal interval returns as soon as a fetch succeeds.
+
+Ranks add, at most once an hour (the first on start-up) and whatever the polling interval, one standings request per selected league competition, plus one request for the world rankings page when the Rugby World Cup, Nations Championship or Internationals is selected (however many of them). These requests run after the games have been fetched, concurrently, and each gives up after 8 seconds. A failed rank request never affects the entities or the polling: the last known ranks are kept and the request is retried after 10 minutes.
+
 ## Known limitations
 
 - RugbyPass has no period field, so the period is derived from the minute: First Half up to minute 40, Second Half after. The half-time boundary is a guess.
@@ -119,6 +161,12 @@ At least one of `next`, `current` or a non-empty `previous` is required; entries
 - A postponed or cancelled game is not shown in any sensor; the Next game sensor skips to the next playable fixture.
 - Champions Cup is not supported yet.
 - Relies on page scraping and may stop working if RugbyPass changes its pages.
+
+## Support
+
+- **Issues**: report bugs or request features via [GitHub Issues](https://github.com/craibo/ha-rugby-pass/issues). Please include your Home Assistant and integration versions and any relevant log lines.
+- **Releases**: [release notes and downloads][releases]
+- **Support this project**: [sponsor on GitHub](https://github.com/sponsors/craibo) or [donate with PayPal](https://paypal.me/craibo?country.x=AU&locale.x=en_AU)
 
 ## Development
 
@@ -144,3 +192,12 @@ The built bundle is committed, and CI fails if it is out of date. Release steps 
 Released under the [MIT License](LICENSE).
 
 The RugbyPass name and logo (`custom_components/rugbypass/brand/icon.png`) are trademarks of their owner and are used here only to identify the service this integration reads from. This project is not affiliated with or endorsed by RugbyPass; the MIT licence above does not cover the logo.
+
+[commits-shield]: https://img.shields.io/github/commit-activity/y/craibo/ha-rugby-pass.svg?style=for-the-badge
+[commits]: https://github.com/craibo/ha-rugby-pass/commits/main
+[hacs]: https://github.com/hacs/integration
+[hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[license-shield]: https://img.shields.io/github/license/craibo/ha-rugby-pass.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/craibo/ha-rugby-pass.svg?style=for-the-badge
+[downloads-shield]: https://img.shields.io/github/downloads/craibo/ha-rugby-pass/total.svg?style=for-the-badge
+[releases]: https://github.com/craibo/ha-rugby-pass/releases
