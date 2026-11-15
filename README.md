@@ -169,14 +169,16 @@ Ranks add, at most once an hour (the first on start-up) and whatever the polling
 
 ## Upgrading from the old name (versions before 0.5.0)
 
-The project was previously published as `ha-rugby-pass`. From version 0.5.0 the integration domain changed from `rugbypass` to `rugby_team_tracker`, so Home Assistant treats it as a new integration and nothing migrates automatically. To switch:
+The project was previously published as `ha-rugby-pass`. From version 0.5.0 the integration domain changed from `rugbypass` to `rugby_team_tracker`, so Home Assistant treats it as a new integration and nothing migrates automatically. Follow these steps in order:
 
-1. In HACS, remove the old repository entry (`craibo/ha-rugby-pass`) and add `https://github.com/craibo/ha-rugby-team-tracker` as a custom repository of type **Integration**. GitHub redirects the old URL after the repository is renamed, but re-adding is the safe route.
-2. In **Settings > Devices & services**, remove the old integration entry.
-3. Restart Home Assistant, download the new version in HACS, restart again, then add **Rugby Team Tracker** and re-select your competitions and teams.
-4. Change dashboard cards from `custom:rugbypass-game-card` / `custom:rugbypass-team-card` to `custom:rugby-tracker-game-card` / `custom:rugby-tracker-team-card`.
-5. Entity IDs (for example `sensor.leinster_next_game`) are normally unchanged because they derive from the device and entity names, but check any automations that reference the removed devices.
-6. Hard-refresh the browser (Ctrl+F5 or Cmd+Shift+R) so the new card bundle loads.
+1. **Read first:** do not just press Update on the old HACS entry. That can leave both the old `rugbypass` and the new `rugby_team_tracker` folders installed, giving duplicate sensors and an old card resource.
+2. In **Settings > Devices & services**, remove the old integration entry. History recorded under the old entities is not carried over; entity IDs (for example `sensor.leinster_next_game`) are normally the same because they derive from the device and entity names, so the new entities pick up the same names but start with fresh history. Check any automations that reference the removed devices.
+3. Then in HACS remove the old repository entry (`craibo/ha-rugby-pass`), or, if you installed it manually, delete the `custom_components/rugbypass` folder.
+4. Restart Home Assistant.
+5. In HACS add `https://github.com/craibo/ha-rugby-team-tracker` as a custom repository of type **Integration** (or follow the redirect once the repository has been renamed), download **Rugby Team Tracker**, and restart again.
+6. Add the **Rugby Team Tracker** integration and re-select your competitions and teams.
+7. Change dashboard cards from `custom:rugbypass-game-card` / `custom:rugbypass-team-card` to `custom:rugby-tracker-game-card` / `custom:rugby-tracker-team-card`. The old card resource disappears when the old integration is removed, so old cards show an error until changed.
+8. Hard-refresh the browser (Ctrl+F5 or Cmd+Shift+R) so the new card bundle loads.
 
 ## Known limitations
 
