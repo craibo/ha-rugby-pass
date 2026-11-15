@@ -84,7 +84,9 @@ export class RugbyPassTeamCard extends LitElement {
               (r) => html`<li class="prev-row">
                 <span class="date">${r.date}</span>
                 <span class="opp"
-                  >${r.opposition}${r.location
+                  >${r.opposition}${r.rankLabel
+                    ? html` <span class="rank">${r.rankLabel}</span>`
+                    : nothing}${r.location
                     ? html` <span class="loc">(${r.location})</span>`
                     : nothing}</span
                 >
@@ -132,8 +134,12 @@ export class RugbyPassTeamCard extends LitElement {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .loc {
+      .loc,
+      .prev-row .rank {
         color: var(--secondary-text-color);
+      }
+      .prev-row .rank {
+        font-size: inherit;
       }
       .score {
         flex: 0 0 auto;

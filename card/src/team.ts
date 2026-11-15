@@ -1,5 +1,5 @@
 import { entitiesChanged, pickStubEntity } from "./editor-helpers";
-import { buildView, type CardView, type HassEntity } from "./state";
+import { buildView, rankFields, type CardView, type HassEntity } from "./state";
 
 export type TeamConfig = {
   type?: string;
@@ -13,6 +13,10 @@ export type PreviousRow = {
   date: string;
   opposition: string;
   location?: string;
+  /** The opposition's league-table position, if known. */
+  rank?: number;
+  /** `rank` formatted for the locale, e.g. "3rd". */
+  rankLabel?: string;
   score: string;
   outcome: "win" | "loss" | "draw" | "unknown";
 };
@@ -96,6 +100,11 @@ function previousRow(
       date: formatDate(a.kickoff, locale, timeZone),
       opposition,
       location: typeof a.venue === "string" && a.venue.trim() !== "" ? a.venue.trim() : undefined,
+      // The opposition is away when we are home, and vice versa.
+      ...rankFields(
+        a.home_away === "home" ? a.away_rank : a.home_away === "away" ? a.home_rank : undefined,
+        locale,
+      ),
       score: state || "Result unavailable",
       outcome,
     };

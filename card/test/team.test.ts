@@ -141,6 +141,42 @@ describe("buildTeamView previous", () => {
       "2026-11-21T09:00:00+00:00",
     );
   });
+  it("rank is the opposition's: away_rank when we are home", () => {
+    const r = buildTeamView(
+      { p1: prev("W 1–0", { home_away: "home", home_rank: 2, away_rank: 9 }) },
+      cfg,
+      "en",
+      "UTC",
+    ).previous[0];
+    expect(r.rank).toBe(9);
+    expect(r.rankLabel).toBe("9th");
+  });
+  it("rank is the opposition's: home_rank when we are away", () => {
+    const r = buildTeamView(
+      { p1: prev("L 0–1", { home_away: "away", opposition: "Scotland", home_rank: 1, away_rank: 13 }) },
+      cfg,
+      "en",
+      "UTC",
+    ).previous[0];
+    expect(r.rank).toBe(1);
+    expect(r.rankLabel).toBe("1st");
+  });
+  it("rank label follows the locale", () => {
+    const r = buildTeamView({ p1: prev("W 1–0", { away_rank: 4 }) }, cfg, "de", "UTC").previous[0];
+    expect(r.rankLabel).toBe("#4");
+  });
+  it("no rank when missing, invalid or home_away unknown", () => {
+    const rank = (over: Record<string, unknown>) =>
+      buildTeamView({ p1: prev("W 1–0", over) }, cfg, "en", "UTC").previous[0];
+    for (const bad of [undefined, null, "3", 0, -2, 1.5, NaN, true]) {
+      const r = rank({ home_rank: bad, away_rank: bad });
+      expect(r.rank).toBeUndefined();
+      expect(r.rankLabel).toBeUndefined();
+      expect(r.opposition).toBe("Wallabies");
+    }
+    expect(rank({ home_away: 7, home_rank: 1, away_rank: 2 }).rank).toBeUndefined();
+    expect(rank({ home_away: undefined, home_rank: 1, away_rank: 2 }).rank).toBeUndefined();
+  });
   it("handles missing previous config", () => {
     expect(buildTeamView({}, { next: "n" }, "en", "UTC").previous).toEqual([]);
   });
