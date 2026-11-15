@@ -4,7 +4,9 @@ An **unofficial** Home Assistant integration that follows rugby teams using the 
 
 > **Disclaimer:** This project is not affiliated with, endorsed by or connected to RugbyPass. RugbyPass has no public API, so the integration reads the same public fixture pages a browser would. It may break at any time if the site changes. Please check RugbyPass's terms of use before using it.
 
-Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. The 6-hour idle interval is shortened so the integration wakes no later than 2 hours before the next kick-off. After a failed fetch it retries every 5 minutes until it succeeds; entities go unavailable only after 3 consecutive failures. One page is fetched per selected competition, however many teams you follow.
+Polling is deliberately light: every 60 seconds only while a followed game is live, every 15 minutes when a followed game starts within 2 hours, and every 6 hours otherwise. The 6-hour idle interval is shortened so the integration wakes no later than 2 hours before the next kick-off. A followed game that is past kick-off but not yet flagged live by RugbyPass is also polled every 60 seconds, for up to 3 hours after kick-off, so the start of a match is not missed.
+
+One page is fetched per selected competition, however many teams you follow, and each competition is handled separately: if one page fails, that competition keeps its last known games while the others still update. When every page fails, the integration retries every 5 minutes; entities go unavailable only after 3 consecutive failures, and after that the retry delay doubles (10, 20, then 40 minutes), never waiting longer than the normal polling interval. The normal interval returns as soon as a fetch succeeds.
 
 Requires Home Assistant 2024.11 or newer.
 
@@ -45,7 +47,7 @@ Attributes on each (empty for Current game when nothing is live): `opposition`, 
 
 ## Game card
 
-The card is bundled with the integration and registered automatically as a Lovelace resource; no manual resource setup is needed (reload the browser after installing). Add it from the card picker (it has a visual editor) or in YAML:
+The card is bundled with the integration, which loads it into the frontend as an extra JavaScript module; no manual resource setup is needed (reload the browser after installing). Because it is loaded this way, it does not appear under **Settings > Dashboards > Resources**. Add it from the card picker (it has a visual editor) or in YAML:
 
 ```yaml
 type: custom:rugbypass-game-card
@@ -81,6 +83,7 @@ Replace `sensor.leinster_next_game` with your own entity ID.
 
 - RugbyPass has no period field, so the period is derived from the minute: First Half up to minute 40, Second Half after. The half-time boundary is a guess.
 - Live-game handling is based on an assumption about the data shape; no live game was available when the parser was written.
+- A postponed or cancelled game is not shown in any sensor; the Next game sensor skips to the next playable fixture.
 - Champions Cup is not supported yet.
 - Relies on page scraping and may stop working if RugbyPass changes its pages.
 

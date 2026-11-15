@@ -19,7 +19,7 @@ The `rugbypass.zip` asset is a convenience download only. HACS installs from the
 The parser was written when the RugbyPass page had no live game, so live handling is an assumption. During a real match involving a followed team:
 
 - Confirm the Current game sensor changes from "No game in progress" to a period and that the card shows the score and a period/minute badge, updating about every 60 s.
-- Check the real shape of the live game's `minute` and `status` fields (view the sensor attributes, or the inline JSON on the fixtures page) and fix `parse_games` in `custom_components/rugbypass/models.py` / `client.py` if they differ (for example `minute` as a string such as "40+2", or a different `status` text).
+- Check the real shape of the live game's `minute` and `status` fields (view the sensor attributes, or the inline JSON on the fixtures page) and fix `parse_games` in `custom_components/rugbypass/source.py` if they differ (for example a different `status` text). A string `minute` such as "40+2" is already read as 40, and a non-numeric one such as "HT" as 0.
 - Check the real half-time minute. If the game is still "First Half" past minute 40 or flips early, tune `HALF_TIME_MINUTE` in `custom_components/rugbypass/models.py`.
 - Check the update interval drops back to 15 min / 6 h once the game ends.
 
