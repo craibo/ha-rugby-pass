@@ -29,6 +29,11 @@ PARALLEL_UPDATES = 0
 type RankLookup = Callable[[str, Team], int | None]
 
 
+def team_url(team: Team) -> str | None:
+    """The team's page on the data source, or None without a slug."""
+    return f"{BASE_URL}/teams/{team.slug}/" if team.slug else None
+
+
 def game_attributes(
     game: Game, team_id: int, ranks: RankLookup | None = None
 ) -> dict[str, Any]:
@@ -58,6 +63,8 @@ def game_attributes(
         "logos": {"home": game.home.logo, "away": game.away.logo},
         "home_rank": ranks(game.competition_slug, game.home) if ranks else None,
         "away_rank": ranks(game.competition_slug, game.away) if ranks else None,
+        "home_team_url": team_url(game.home),
+        "away_team_url": team_url(game.away),
     }
 
 
