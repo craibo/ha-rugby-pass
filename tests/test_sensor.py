@@ -21,7 +21,7 @@ from .test_coordinator import NOW, T1, T2, T3, g
 ATTR_KEYS = {
     "opposition", "home_away", "kickoff", "venue", "home_team", "away_team",
     "home_score", "away_score", "period", "minute", "status", "match_url", "logos",
-    "home_rank", "away_rank",
+    "home_rank", "away_rank", "home_team_url", "away_team_url",
 }  # fmt: skip
 
 
@@ -217,6 +217,26 @@ def test_game_attributes_home_and_away():
     assert game_attributes(replace(game, url="https://x/y"), 1)["match_url"] == "https://x/y"
 
     assert home["home_rank"] is None and home["away_rank"] is None
+
+
+def test_game_attributes_team_urls_from_slug():
+    game = g(1, timedelta(days=1), home=T1, away=T2)
+    game = replace(
+        game,
+        home=replace(T1, slug="south-africa"),
+        away=replace(T2, slug="cardiff-blues"),
+    )
+    attrs = game_attributes(game, 1)
+    assert attrs["home_team_url"] == "https://www.rugbypass.com/teams/south-africa/"
+    assert attrs["away_team_url"] == "https://www.rugbypass.com/teams/cardiff-blues/"
+    assert game_attributes(game, 2)["home_team_url"] == attrs["home_team_url"]
+
+
+def test_game_attributes_team_url_none_for_empty_slug():
+    game = g(1, timedelta(days=1), home=replace(T1, slug="leinster"), away=replace(T2, slug=""))
+    attrs = game_attributes(game, 1)
+    assert attrs["home_team_url"] == "https://www.rugbypass.com/teams/leinster/"
+    assert attrs["away_team_url"] is None
 
 
 def test_game_attributes_ranks_from_lookup():

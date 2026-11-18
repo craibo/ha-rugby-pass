@@ -80,7 +80,7 @@ Seven sensors per team:
 
 Current game and Previous game 1 to 5 use a rugby ball icon. Next game keeps Home Assistant's default clock icon (it is a timestamp sensor).
 
-Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute` (as reported by the data source; frozen during Half Time), `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)).
+Attributes on each (empty for Current game when nothing is live): `opposition`, `home_away`, `kickoff`, `venue`, `home_team`, `away_team`, `home_score`, `away_score`, `period`, `minute` (as reported by the data source; frozen during Half Time), `status`, `match_url`, `logos` (`home` and `away` URLs), `home_rank` and `away_rank` (each team's league-table position or World Rugby ranking, depending on the competition, or none when unknown; see [Ranks](#ranks)), `home_team_url` and `away_team_url` (each team's page on the data source, or none when unknown).
 
 ### Ranks
 
@@ -133,7 +133,8 @@ One card per team: the current game if one is live, otherwise the next game, wit
 
 ```yaml
 type: custom:rugby-tracker-team-card
-title: Leinster            # optional
+title: Leinster            # optional, defaults to the team name
+show_header: true          # optional, set false to hide the header
 current: sensor.leinster_current_game
 next: sensor.leinster_next_game
 previous:
@@ -146,7 +147,15 @@ previous:
 
 At least one of `next`, `current` or a non-empty `previous` is required; entries in `previous` beyond five are ignored. Each previous result shows the date, the opposition, its current rank (league position or world ranking) and the venue in brackets (for example `Munster 3rd (Stade de France)`; the rank and venue are in lighter text and left out when unknown), and the score coloured green for a win, red for a loss and amber for a draw. Slots with no game are left out, so a team with fewer than five past games shows fewer rows. With nothing live or scheduled the top block reads "No game". The top block shows ranks after both team names, as in the game card. Ranks use English ordinals (1st, 2nd, 3rd) when Home Assistant's language is English and `#1`, `#2` otherwise.
 
-Clicking a previous-result row opens that match on the website in a new tab, and clicking the top block does the same when it shows a live game (rows without a match link stay plain text). The next game is not clickable. The venue of an upcoming game shows under its kick-off time.
+**Header:** the card starts with a header showing the followed team's name, worked out from the sensors (a trailing "Current game" / "Next game" / "Previous game N" is removed from the sensor name if the attributes are not available). Set `title` to use your own text instead, or `show_header: false` to hide the header. The visual editor has a matching "Show header" toggle.
+
+**Clicks:** everything opens in a new tab on the website.
+
+- In the top block (live or next game), the team logo and name open that team's page, and the middle (date, time and venue, or the score) opens the game page.
+- A previous-result row opens its match.
+- Anything without a known link stays plain text.
+
+The single-game card keeps its simpler behaviour: the whole block is one link to the match, for live and finished games only. The venue of an upcoming game shows under its kick-off time.
 
 **Visual editor:** pick any one of the team's game sensors and the editor fills in the other six from the entity-id naming (`..._current_game`, `..._next_game`, `..._previous_game_1` to `5`). If you have renamed the entities so they no longer follow that pattern, set the entity ids explicitly in YAML as above. If the sensor you pick does not follow the naming pattern, the editor sets only `next`; add `current` and `previous` in YAML.
 

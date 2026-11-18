@@ -4,6 +4,8 @@ import { buildView, rankFields, safeMatchUrl, type CardView, type HassEntity } f
 export type TeamConfig = {
   type?: string;
   title?: string;
+  /** Show the header (default true). */
+  show_header?: boolean;
   current?: string;
   next?: string;
   previous?: string[];
@@ -62,7 +64,54 @@ export function validateTeamConfig(config: TeamConfig): TeamConfig {
   if (!present) {
     throw new Error("rugby-tracker-team-card: configure at least 'next', 'current' or 'previous'");
   }
-  return { ...config, previous: previous.slice(0, MAX_PREVIOUS) };
+  const out: TeamConfig = { ...config, previous: previous.slice(0, MAX_PREVIOUS) };
+  if (typeof out.title !== "string") delete out.title;
+  if (typeof out.show_header !== "boolean") delete out.show_header;
+  return out;
+}
+
+const NAME_SUFFIX = /(?:^|\s+)(?:current game|next game|previous game [1-5])\s*$/i;
+
+/** Entity ids in priority order for the header: next, current, previous 1..5. */
+function headerEntityIds(config: TeamConfig | undefined): string[] {
+  if (!config || typeof config !== "object") return [];
+  const previous = Array.isArray(config.previous) ? config.previous.slice(0, MAX_PREVIOUS) : [];
+  return [config.next, config.current, ...previous].filter(
+    (e): e is string => typeof e === "string" && e !== "",
+  );
+}
+
+/**
+ * The followed team's name: from the sensors' attributes (home_away picks
+ * home_team or away_team), else from the first entity's friendly name
+ * without its "Current game" / "Next game" / "Previous game N" suffix.
+ * Never throws.
+ */
+export function deriveTeamName(
+  states: Record<string, HassEntity | undefined> | undefined,
+  config: TeamConfig | undefined,
+): string | undefined {
+  try {
+    const ids = headerEntityIds(config);
+    const get = (id: string) => (states && typeof states === "object" ? states[id] : undefined);
+    for (const id of ids) {
+      const a = get(id)?.attributes;
+      if (!a || typeof a !== "object") continue;
+      const name =
+        a.home_away === "home" ? str(a.home_team) : a.home_away === "away" ? str(a.away_team) : undefined;
+      if (name) return name;
+    }
+    for (const id of ids) {
+      const a = get(id)?.attributes;
+      const friendly = a && typeof a === "object" ? str(a.friendly_name) : undefined;
+      if (!friendly) continue;
+      const name = friendly.replace(NAME_SUFFIX, "").trim();
+      return name !== "" ? name : undefined;
+    }
+  } catch {
+    // fall through
+  }
+  return undefined;
 }
 
 /** All entity ids the card watches. */
@@ -135,7 +184,11 @@ export function buildTeamView(
     .slice(0, MAX_PREVIOUS)
     .map((id) => previousRow(get(id), locale, timeZone))
     .filter((r): r is PreviousRow => r !== undefined);
-  return { top, previous, heading: str(config.title) };
+  const heading =
+    config.show_header === false
+      ? undefined
+      : (str(config.title) ?? deriveTeamName(states, config));
+  return { top, previous, heading };
 }
 
 type States = Record<string, unknown> | undefined;
@@ -169,9 +222,12 @@ export function buildEditorConfig(
   title: string | undefined,
   type: string | undefined,
   _old: TeamConfig | undefined,
+  showHeader?: boolean,
 ): TeamConfig {
   const config: TeamConfig = { type: type ?? "custom:rugby-tracker-team-card" };
   if (title) config.title = title;
+  // show_header defaults to true, so it is only written when turned off.
+  if (showHeader === false) config.show_header = false;
   const derived = picked ? deriveTeamEntities(picked) : undefined;
   if (derived) {
     config.current = derived.current;

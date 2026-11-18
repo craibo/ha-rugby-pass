@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTeamView,
   deriveTeamEntities,
+  deriveTeamName,
   validateTeamConfig,
   teamEntityIds,
   shouldUpdateTeamCard,
@@ -89,6 +90,36 @@ describe("buildTeamView top", () => {
   it("heading from title", () => {
     expect(buildTeamView({}, { ...cfg, title: "Leinster" }, "en", "UTC").heading).toBe("Leinster");
     expect(buildTeamView({}, cfg, "en", "UTC").heading).toBeUndefined();
+  });
+  it("heading defaults to the followed team's name", () => {
+    expect(buildTeamView({ n: next }, cfg, "en", "UTC").heading).toBe("Scotland");
+  });
+  it("title overrides the derived name; empty or non-string title does not", () => {
+    expect(buildTeamView({ n: next }, { ...cfg, title: "My side" }, "en", "UTC").heading).toBe("My side");
+    for (const bad of ["", 5, null, {}]) {
+      expect(buildTeamView({ n: next }, { ...cfg, title: bad as never }, "en", "UTC").heading).toBe("Scotland");
+    }
+  });
+  it("show_header false hides it, even with a title", () => {
+    expect(buildTeamView({ n: next }, { ...cfg, show_header: false }, "en", "UTC").heading).toBeUndefined();
+    expect(
+      buildTeamView({ n: next }, { ...cfg, title: "X", show_header: false }, "en", "UTC").heading,
+    ).toBeUndefined();
+    expect(buildTeamView({ n: next }, { ...cfg, show_header: true }, "en", "UTC").heading).toBe("Scotland");
+    expect(buildTeamView({ n: next }, { ...cfg, show_header: "no" as never }, "en", "UTC").heading).toBe("Scotland");
+  });
+  it("top block carries team and match urls for live and next", () => {
+    const urls = {
+      match_url: "https://www.rugbypass.com/live/a/?g=1",
+      home_team_url: "https://www.rugbypass.com/teams/scotland/",
+      away_team_url: "https://www.rugbypass.com/teams/australia/",
+    };
+    const n = { ...next, attributes: { ...next.attributes, ...urls } };
+    const top = buildTeamView({ n }, cfg, "en", "UTC").top;
+    expect(top.mode).toBe("upcoming");
+    expect(top.matchUrl).toBe(urls.match_url);
+    expect(top.home.url).toBe(urls.home_team_url);
+    expect(top.away.url).toBe(urls.away_team_url);
   });
 });
 
@@ -200,6 +231,15 @@ describe("validateTeamConfig", () => {
     expect(() => validateTeamConfig({ current: "" })).not.toThrow();
     expect(validateTeamConfig({ next: "" }).previous).toEqual([]);
   });
+  it("keeps a string title and a boolean show_header, drops other types", () => {
+    expect(validateTeamConfig({ next: "a", title: "T", show_header: false })).toMatchObject({
+      title: "T",
+      show_header: false,
+    });
+    const bad = validateTeamConfig({ next: "a", title: 5, show_header: "yes" } as never);
+    expect("title" in bad).toBe(false);
+    expect("show_header" in bad).toBe(false);
+  });
   it("accepts next, current or previous", () => {
     expect(validateTeamConfig({ next: "a" }).next).toBe("a");
     expect(validateTeamConfig({ current: "a" }).current).toBe("a");
@@ -288,6 +328,14 @@ describe("buildEditorConfig", () => {
       ...deriveTeamEntities("sensor.x_next_game"),
     });
   });
+  it("writes show_header only when hidden, and never mutates the old config", () => {
+    const old = { type: "t", next: "n", show_header: true };
+    const c = buildEditorConfig("sensor.x_next_game", undefined, "t", old, false);
+    expect(c.show_header).toBe(false);
+    expect("show_header" in buildEditorConfig("sensor.x_next_game", undefined, "t", old, true)).toBe(false);
+    expect("show_header" in buildEditorConfig("sensor.x_next_game", undefined, "t", old)).toBe(false);
+    expect(old).toEqual({ type: "t", next: "n", show_header: true });
+  });
   it("omits empty title", () => {
     expect("title" in buildEditorConfig("sensor.x_next_game", "", "t", undefined)).toBe(false);
   });
@@ -305,6 +353,62 @@ describe("buildEditorConfig", () => {
       type: "t",
       next: "sensor.other",
     });
+  });
+});
+
+describe("deriveTeamName", () => {
+  const a = (over: Record<string, unknown>): HassEntity => ({ state: "x", attributes: { ...base, ...over } });
+  const c = { current: "c", next: "n", previous: ["p1", "p2"] };
+  it("home_away home gives the home team, away gives the away team", () => {
+    expect(deriveTeamName({ n: a({ home_away: "home" }) }, c)).toBe("Scotland");
+    expect(deriveTeamName({ n: a({ home_away: "away" }) }, c)).toBe("Wallabies");
+  });
+  it("prefers next, then current, then previous in order", () => {
+    const cur = a({ home_away: "home", home_team: "Cur" });
+    const p1 = a({ home_away: "home", home_team: "P1" });
+    const p2 = a({ home_away: "home", home_team: "P2" });
+    expect(deriveTeamName({ n: a({ home_team: "Nxt" }), c: cur, p1, p2 }, c)).toBe("Nxt");
+    expect(deriveTeamName({ c: cur, p1, p2 }, c)).toBe("Cur");
+    expect(deriveTeamName({ p1, p2 }, c)).toBe("P1");
+    expect(deriveTeamName({ p2 }, c)).toBe("P2");
+  });
+  it("skips entities without usable attributes", () => {
+    const empty: HassEntity = { state: "No game in progress", attributes: {} };
+    expect(deriveTeamName({ n: empty, c: empty, p1: a({ home_away: "away" }) }, c)).toBe("Wallabies");
+    expect(deriveTeamName({ n: a({ home_away: "sideways" }), c: a({ home_away: "away" }) }, c)).toBe("Wallabies");
+    expect(deriveTeamName({ n: a({ home_away: "home", home_team: "" }), c: a({ home_away: "away" }) }, c)).toBe(
+      "Wallabies",
+    );
+  });
+  it.each([
+    ["Leinster Current game", "Leinster"],
+    ["Leinster Next game", "Leinster"],
+    ["Leinster Previous game 3", "Leinster"],
+    ["Leinster next GAME", "Leinster"],
+    ["Cardiff Blues  previous game 5", "Cardiff Blues"],
+  ])("falls back to friendly name %s", (fn, want) => {
+    const e: HassEntity = { state: "unknown", attributes: { friendly_name: fn } };
+    expect(deriveTeamName({ n: e }, c)).toBe(want);
+  });
+  it("uses the first configured entity's friendly name", () => {
+    const n: HassEntity = { state: "unknown", attributes: { friendly_name: "Leinster Next game" } };
+    const cu: HassEntity = { state: "unknown", attributes: { friendly_name: "Other Current game" } };
+    expect(deriveTeamName({ n, c: cu }, c)).toBe("Leinster");
+  });
+  it("is undefined with nothing to go on", () => {
+    expect(deriveTeamName({}, c)).toBeUndefined();
+    expect(deriveTeamName({ n: { state: "unknown", attributes: {} } }, c)).toBeUndefined();
+    expect(deriveTeamName({ n: { state: "unknown", attributes: { friendly_name: "Current game" } } }, c)).toBeUndefined();
+    expect(deriveTeamName({ n: a({}) }, {})).toBeUndefined();
+  });
+  it("never throws on wrong types", () => {
+    const junk = [undefined, null, 5, "x", { state: 1, attributes: "nope" }, { attributes: null }, { attributes: { home_away: 7, home_team: {}, friendly_name: 9 } }];
+    for (const j of junk) {
+      expect(() => deriveTeamName({ n: j as never, c: j as never, p1: j as never }, c)).not.toThrow();
+    }
+    expect(() => deriveTeamName(undefined as never, c)).not.toThrow();
+    expect(() => deriveTeamName({}, undefined as never)).not.toThrow();
+    expect(() => deriveTeamName({}, { next: 5, previous: "x" } as never)).not.toThrow();
   });
 });
 
@@ -335,9 +439,12 @@ describe("buildTeamView previous matchUrl", () => {
     );
     expect(v.previous.map((r) => r.matchUrl)).toEqual([U, undefined, undefined, undefined]);
   });
-  it("top block carries matchUrl only when live", () => {
+  it("top block carries matchUrl for live and for next", () => {
     const l = { ...live, attributes: { ...live.attributes, match_url: U } };
     expect(buildTeamView({ c: l, n: next }, cfg, "en", "UTC").top.matchUrl).toBe(U);
+    // `next` has an unsafe match_url ("x"), so no link.
     expect(buildTeamView({ c: none, n: next }, cfg, "en", "UTC").top.matchUrl).toBeUndefined();
+    const n = { ...next, attributes: { ...next.attributes, match_url: U } };
+    expect(buildTeamView({ c: none, n }, cfg, "en", "UTC").top.matchUrl).toBe(U);
   });
 });
