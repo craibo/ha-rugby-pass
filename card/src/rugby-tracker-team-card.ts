@@ -76,7 +76,7 @@ export class RugbyTrackerTeamCard extends LitElement {
     if (!v) return nothing;
     return html`<ha-card>
       ${v.heading ? html`<div class="heading">${v.heading}</div>` : nothing}
-      ${gameBlock(v.top)}
+      ${gameBlock(v.top, { linkMode: "parts" })}
       <hr class="divider" />
       ${v.previous.length === 0
         ? html`<div class="none">No previous games</div>`

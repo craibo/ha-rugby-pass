@@ -7,6 +7,8 @@ export type TeamView = {
   rank?: number;
   /** `rank` formatted for the locale, e.g. "3rd" or "#3". */
   rankLabel?: string;
+  /** Validated data-source page of the team, if known. */
+  url?: string;
 };
 export type CardView = {
   mode: "upcoming" | "live" | "final" | "empty";
@@ -18,7 +20,7 @@ export type CardView = {
   dateLine?: string;
   /** Upcoming only: the venue, shown under the kick-off time. */
   venue?: string;
-  /** Live and final only: absolute data-source match page (validated). */
+  /** Absolute data-source match page (validated). Not set for `empty` views. */
   matchUrl?: string;
 };
 
@@ -51,10 +53,19 @@ export function safeMatchUrl(value: unknown): string | undefined {
   }
 }
 
+/** Alias for links that are not match pages (team pages): same allow-list. */
+export const safeSourceUrl = safeMatchUrl;
+
 /** Accessible name for a match link. */
 export function matchLinkLabel(home: string, away: string): string {
   return `Open the match on the website: ${home} v ${away}`;
 }
+
+/** Accessible name for a team-page link. */
+export const teamLinkLabel = (name: string): string => `Open ${name} on the website`;
+
+/** Accessible name for the middle (game page) link of the team card. */
+export const matchPartLabel = (): string => "Open the match on the website";
 
 const venueOf = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
@@ -134,12 +145,14 @@ export function buildView(
       logo: str(logos.home),
       score: hs,
       ...rankFields(a.home_rank, locale),
+      url: safeSourceUrl(a.home_team_url),
     };
     const away: TeamView = {
       name: awayName,
       logo: str(logos.away),
       score: as,
       ...rankFields(a.away_rank, locale),
+      url: safeSourceUrl(a.away_team_url),
     };
     const score = `${hs ?? "-"} – ${as ?? "-"}`;
 
@@ -151,6 +164,7 @@ export function buildView(
           away,
           ...formatKickoff(a.kickoff, locale, timeZone),
           venue: venueOf(a.venue),
+          matchUrl: safeMatchUrl(a.match_url),
         };
       case "Postponed":
       case "Cancelled":
@@ -161,6 +175,7 @@ export function buildView(
           ...formatKickoff(a.kickoff, locale, timeZone),
           badge: period,
           venue: venueOf(a.venue),
+          matchUrl: safeMatchUrl(a.match_url),
         };
       case "First Half":
       case "Second Half": {

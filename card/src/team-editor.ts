@@ -1,16 +1,18 @@
 import { LitElement, html, type TemplateResult } from "lit";
 import { buildEditorConfig, type TeamConfig } from "./team";
 
-type FormData = { entity?: string; title?: string };
+type FormData = { entity?: string; title?: string; show_header?: boolean };
 
 const SCHEMA = [
   { name: "entity", selector: { entity: { domain: "sensor", integration: "rugby_team_tracker" } } },
   { name: "title", selector: { text: {} } },
+  { name: "show_header", selector: { boolean: {} } },
 ];
 
 const LABELS: Record<string, string> = {
   entity: "Any game sensor for the team",
-  title: "Title (optional)",
+  title: "Header title (optional, defaults to the team name)",
+  show_header: "Show header",
 };
 
 export class RugbyTrackerTeamCardEditor extends LitElement {
@@ -33,7 +35,9 @@ export class RugbyTrackerTeamCardEditor extends LitElement {
   private _helper = (field: { name: string }): string | undefined =>
     field.name === "entity"
       ? "Other sensors are filled in automatically. Set them individually in YAML if needed."
-      : undefined;
+      : field.name === "show_header"
+        ? "Show the followed team's name (or your title) at the top of the card."
+        : undefined;
 
   private _label = (field: { name: string }): string => LABELS[field.name] ?? field.name;
 
@@ -41,7 +45,8 @@ export class RugbyTrackerTeamCardEditor extends LitElement {
     const value = (ev.detail?.value ?? {}) as FormData;
     const picked = typeof value.entity === "string" ? value.entity : "";
     const title = typeof value.title === "string" && value.title !== "" ? value.title : undefined;
-    const config = buildEditorConfig(picked, title, this._config?.type, this._config);
+    const showHeader = value.show_header === false ? false : undefined;
+    const config = buildEditorConfig(picked, title, this._config?.type, this._config, showHeader);
     this._config = config;
     this.dispatchEvent(
       new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),
@@ -53,6 +58,7 @@ export class RugbyTrackerTeamCardEditor extends LitElement {
     const data: FormData = {
       entity: this._config.next || this._config.current || this._config.previous?.[0] || "",
       title: this._config.title ?? "",
+      show_header: this._config.show_header !== false,
     };
     return html`<ha-form
       .hass=${this._hass}

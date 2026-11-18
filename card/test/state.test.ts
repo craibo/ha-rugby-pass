@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildView, formatRank, safeMatchUrl, matchLinkLabel, type HassEntity } from "../src/state";
+import { buildView, formatRank, safeMatchUrl, safeSourceUrl, matchLinkLabel, type HassEntity } from "../src/state";
 
 const base = {
   opposition: "Wallabies",
@@ -223,12 +223,14 @@ describe("safeMatchUrl", () => {
 
 describe("buildView matchUrl and venue", () => {
   const live = { period: "First Half", minute: 3, home_score: 0, away_score: 0, match_url: GOOD };
-  it("matchUrl for live and final only", () => {
+  it("matchUrl for live, half-time, final and upcoming views", () => {
     expect(buildView(ent(live), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ ...live, period: "Half Time" }), "en", "UTC").matchUrl).toBe(GOOD);
     expect(buildView(ent({ ...live, period: "Result" }), "en", "UTC").matchUrl).toBe(GOOD);
-    expect(buildView(ent({ match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
-    expect(buildView(ent({ period: "Postponed", match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
-    expect(buildView(ent({ period: "Cancelled", match_url: GOOD }), "en", "UTC").matchUrl).toBeUndefined();
+    expect(buildView(ent({ match_url: GOOD }), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ period: "Postponed", match_url: GOOD }), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ period: "Cancelled", match_url: GOOD }), "en", "UTC").matchUrl).toBe(GOOD);
+    expect(buildView(ent({ match_url: "http://www.rugbypass.com/x" }), "en", "UTC").matchUrl).toBeUndefined();
     expect(buildView({ state: "unknown", attributes: { match_url: GOOD } }, "en", "UTC").matchUrl).toBeUndefined();
   });
   it("rejects unsafe or mistyped urls without throwing", () => {
@@ -252,4 +254,47 @@ describe("buildView matchUrl and venue", () => {
 
 it("matchLinkLabel names both teams", () => {
   expect(matchLinkLabel("Scotland", "Wales")).toBe("Open the match on the website: Scotland v Wales");
+});
+
+describe("team urls", () => {
+  const T = "https://www.rugbypass.com/teams/south-africa/";
+  const A = "https://www.rugbypass.com/teams/cardiff-blues/";
+  it("carries home and away team pages through the allow-list", () => {
+    const v = buildView(ent({ home_team_url: T, away_team_url: A }), "en", "UTC");
+    expect(v.home.url).toBe(T);
+    expect(v.away.url).toBe(A);
+  });
+  it("is available for live, final and upcoming views", () => {
+    for (const period of ["Kick off", "First Half", "Half Time", "Second Half", "Result", "Postponed"]) {
+      const v = buildView(ent({ period, home_team_url: T, away_team_url: A }), "en", "UTC");
+      expect(v.home.url, period).toBe(T);
+      expect(v.away.url, period).toBe(A);
+    }
+  });
+  it("rejects unsafe, foreign, insecure and non-string values without throwing", () => {
+    for (const bad of [
+      "javascript:alert(1)",
+      "https://evil.example/teams/x/",
+      "http://www.rugbypass.com/teams/x/",
+      "https://www.rugbypass.com.evil.example/teams/x/",
+      5,
+      null,
+      {},
+      ["x"],
+      "",
+    ]) {
+      const v = buildView(ent({ home_team_url: bad, away_team_url: bad }), "en", "UTC");
+      expect(v.mode).toBe("upcoming");
+      expect(v.home.url, String(bad)).toBeUndefined();
+      expect(v.away.url, String(bad)).toBeUndefined();
+    }
+  });
+  it("is absent when the attributes are missing", () => {
+    expect(buildView(ent(), "en", "UTC").home.url).toBeUndefined();
+  });
+  it("safeSourceUrl is the same allow-list as safeMatchUrl", () => {
+    expect(safeSourceUrl(T)).toBe(T);
+    expect(safeSourceUrl("http://www.rugbypass.com/")).toBeUndefined();
+    expect(safeSourceUrl(7)).toBeUndefined();
+  });
 });
